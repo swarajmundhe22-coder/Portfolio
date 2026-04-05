@@ -1,382 +1,1085 @@
-import { useEffect, useState, useRef } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
-import { Github, Linkedin, Twitter, Mail, ExternalLink, ChevronDown, Menu, X, ArrowRight } from 'lucide-react';
-import supabase from './lib/supabase';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
+import {
+  AlertCircle,
+  ArrowUpRight,
+  CheckCircle2,
+  Command,
+  ExternalLink,
+  Github,
+  Globe2,
+  Linkedin,
+  LocateFixed,
+  Mail,
+  Menu,
+  MessageCircle,
+  MoonStar,
+  Send,
+  Twitter,
+  X,
+} from 'lucide-react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import {
+  footerGroups,
+  navLinks,
+  profileIdentity,
+  socialHandles,
+  stackTags,
+  testimonials,
+  timelineEntries,
+  workItems,
+} from './data/portfolioData';
+import './App.css';
 
-// Types
-interface Project {
-  id: number;
+const loadCubeWidget = () => import('./components/CubeWidget.tsx');
+const loadGlobeWidget = () => import('./components/GlobeWidget.tsx');
+const loadTimezoneClockWidget = () => import('./components/TimezoneClockWidget.tsx');
+const loadDynamicBlogCards = () => import('./components/DynamicBlogCards.tsx');
+const loadStackAnimationScene = () => import('./components/StackAnimationScene.tsx');
+const loadBookingScheduler = () => import('./components/BookingScheduler.tsx');
+
+const CubeWidget = lazy(loadCubeWidget);
+const GlobeWidget = lazy(loadGlobeWidget);
+const TimezoneClockWidget = lazy(loadTimezoneClockWidget);
+const DynamicBlogCards = lazy(loadDynamicBlogCards);
+const StackAnimationScene = lazy(loadStackAnimationScene);
+const BookingScheduler = lazy(loadBookingScheduler);
+
+interface SectionTitleProps {
+  sectionId: string;
+  navSection?: string;
+  eyebrow: string;
   title: string;
-  description: string;
-  image_url: string;
-  year: number;
-  category: string;
-  link_url: string;
+  script: string;
 }
 
-// Components
-const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+interface RuntimeFlags {
+  visualRegressionMode: boolean;
+  forceSkeleton: boolean;
+  forceModal: boolean;
+  forceValidation: boolean;
+  forceNavExpanded: boolean;
+  forceMobileNav: boolean;
+  forceButtonStates: boolean;
+}
 
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+interface ContactFormValues {
+  name: string;
+  email: string;
+  message: string;
+}
 
-  const navLinks = [
-    { name: 'Vision', href: '#vision' },
-    { name: 'Projects', href: '#projects' },
-    { name: 'About', href: '#about' },
-    { name: 'Contact', href: '#contact' },
-  ];
+interface ContactFormErrors {
+  name?: string;
+  email?: string;
+  message?: string;
+}
 
-  return (
-    <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${isScrolled ? 'bg-black/80 backdrop-blur-md py-4' : 'bg-transparent py-8'}`}>
-      <div className="container mx-auto px-6 flex justify-between items-center">
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-2xl font-display font-bold tracking-tighter text-white"
-        >
-          SWARAJ <span className="text-zinc-500">MUNDHE</span>
-        </motion.div>
-        
-        <div className="hidden md:flex space-x-12">
-          {navLinks.map((link, i) => (
-            <motion.a
-              key={link.name}
-              href={link.href}
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="text-sm uppercase tracking-widest text-zinc-400 hover:text-white transition-colors"
-            >
-              {link.name}
-            </motion.a>
-          ))}
-        </div>
-
-        <button 
-          className="md:hidden text-white"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-zinc-900 border-b border-zinc-800 overflow-hidden"
-          >
-            <div className="flex flex-col p-6 space-y-4">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="text-lg text-zinc-300 hover:text-white"
-                >
-                  {link.name}
-                </a>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
-  );
+const titleTransition = {
+  duration: 0.9,
+  ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
 };
 
-const Hero = () => {
-  const { scrollY } = useScroll();
-  const y1 = useTransform(scrollY, [0, 500], [0, 200]);
-  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
-
-  return (
-    <section className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-black">
-      <motion.div style={{ y: y1, opacity }} className="absolute inset-0 z-0">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover opacity-40 scale-110 grayscale contrast-125"
-        >
-          <source src="/hero-bg.mp4" type="video/mp4" />
-        </video>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black" />
-      </motion.div>
-
-      <div className="container mx-auto px-6 relative z-10 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-        >
-          <span className="text-zinc-500 uppercase tracking-[0.3em] text-sm mb-4 block">Visionary Founder & Strategist</span>
-          <h1 className="text-6xl md:text-9xl font-display font-bold text-white mb-8 tracking-tighter leading-none">
-            Architecting the <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-200 to-zinc-600">Future of Tech</span>
-          </h1>
-          <p className="text-zinc-400 text-lg md:text-xl max-w-2xl mx-auto mb-12 font-light leading-relaxed">
-            Building digital ecosystems that bridge the gap between human intuition and technological excellence.
-          </p>
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-            <a href="#projects" className="px-8 py-4 bg-white text-black font-medium hover:bg-zinc-200 transition-all rounded-sm flex items-center gap-2">
-              Explore Works <ArrowRight size={18} />
-            </a>
-            <a href="#contact" className="px-8 py-4 border border-zinc-700 text-white font-medium hover:bg-zinc-900 transition-all rounded-sm">
-              Get in Touch
-            </a>
-          </div>
-        </motion.div>
-      </div>
-
-      <motion.div 
-        animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-        className="absolute bottom-10 left-1/2 -translate-x-1/2 text-zinc-500 cursor-pointer"
-        onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
-      >
-        <ChevronDown size={32} />
-      </motion.div>
-    </section>
-  );
+const cinematicEase = [0.16, 1, 0.3, 1] as [number, number, number, number];
+const cardRevealTransition = {
+  duration: 0.76,
+  ease: cinematicEase,
 };
 
-const VisionSection = () => {
-  const containerRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start end", "end start"]
-  });
-
-  const xLeft = useTransform(scrollYProgress, [0, 1], [-100, 100]);
-  const xRight = useTransform(scrollYProgress, [0, 1], [100, -100]);
-
-  return (
-    <section id="vision" ref={containerRef} className="py-32 bg-black overflow-hidden">
-      <div className="container mx-auto px-6">
-        <div className="flex flex-col space-y-24">
-          <motion.div style={{ x: xLeft }} className="text-7xl md:text-[12rem] font-bold text-zinc-900 whitespace-nowrap select-none">
-            INNOVATION • DISRUPTION • VISION •
-          </motion.div>
-          
-          <div className="max-w-4xl mx-auto text-center space-y-8">
-            <motion.h2 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-4xl md:text-6xl font-display font-bold text-white"
-            >
-              Beyond the Horizon
-            </motion.h2>
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="text-xl text-zinc-400 leading-relaxed font-light"
-            >
-              I believe in technology that disappears into the background, empowering human creativity rather than replacing it. My journey is defined by the pursuit of elegance in complexity and the courage to challenge established norms.
-            </motion.p>
-          </div>
-
-          <motion.div style={{ x: xRight }} className="text-7xl md:text-[12rem] font-bold text-zinc-900 whitespace-nowrap select-none self-end">
-            • EXECUTION • SCALE • FUTURE •
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
+const initialContactValues: ContactFormValues = {
+  name: '',
+  email: '',
+  message: '',
 };
 
-const ProjectsSection = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
+const WidgetFallback = ({ className }: { className?: string }) => (
+  <div className={`widget-loading-placeholder ${className ?? ''}`.trim()} aria-hidden="true" />
+);
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      const { data } = await supabase.from('projects').select('*').order('year', { ascending: false });
-      if (data) setProjects(data as Project[]);
+const SectionTitle = ({ sectionId, navSection, eyebrow, title, script }: SectionTitleProps) => (
+  <section id={sectionId} data-section={navSection} className="section-title-block">
+    <motion.div
+      initial={{ opacity: 0, y: 28, filter: 'blur(10px)' }}
+      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      viewport={{ once: true, amount: 0.5 }}
+      transition={titleTransition}
+      className="section-title-content"
+    >
+      <p className="section-eyebrow">{eyebrow}</p>
+      <h2 className="section-title-main">{title}</h2>
+      <p className="section-title-script">{script}</p>
+    </motion.div>
+  </section>
+);
+
+const clampPercent = (value: number): number => Math.min(1, Math.max(0, value));
+
+const getHeatValue = (index: number): number => {
+  const seeded = Math.sin(index * 13.7 + 2.5) * 43758.5453;
+  return clampPercent(seeded - Math.floor(seeded));
+};
+
+const getRuntimeFlags = (): RuntimeFlags => {
+  if (typeof window === 'undefined') {
+    return {
+      visualRegressionMode: false,
+      forceSkeleton: false,
+      forceModal: false,
+      forceValidation: false,
+      forceNavExpanded: false,
+      forceMobileNav: false,
+      forceButtonStates: false,
     };
-    fetchProjects();
-  }, []);
+  }
 
-  return (
-    <section id="projects" className="py-32 bg-zinc-950">
-      <div className="container mx-auto px-6">
-        <div className="mb-20">
-          <span className="text-zinc-500 uppercase tracking-widest text-sm mb-4 block">Selected Works</span>
-          <h2 className="text-5xl md:text-7xl font-display font-bold text-white">Featured Ventures</h2>
-        </div>
+  const search = new URLSearchParams(window.location.search);
+  const visualRegressionMode = search.get('vr') === '1';
+  const state = (search.get('state') ?? '').toLowerCase();
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {projects.map((project, index) => (
-            <motion.div
-              key={project.id}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
-              className="group cursor-pointer"
-            >
-              <div className="relative aspect-[16/10] overflow-hidden mb-6 bg-zinc-900">
-                <img 
-                  src={project.image_url} 
-                  alt={project.title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 grayscale group-hover:grayscale-0"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <ExternalLink className="text-white" size={32} />
-                </div>
-                <div className="absolute top-4 right-4 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
-                  <span className="text-xs text-white font-medium">{project.year}</span>
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-zinc-400 transition-colors">{project.title}</h3>
-              <p className="text-zinc-500 font-light line-clamp-2">{project.description}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+  return {
+    visualRegressionMode,
+    forceSkeleton: state === 'skeleton',
+    forceModal: state === 'modal',
+    forceValidation: state === 'validation',
+    forceNavExpanded: state === 'nav-expanded',
+    forceMobileNav: state === 'nav-mobile',
+    forceButtonStates: state === 'button-states',
+  };
 };
 
-const ContactSection = () => {
-  const [formState, setFormState] = useState({ name: '', email: '', message: '' });
-  const [status, setStatus] = useState('idle');
+const isExternalHref = (href: string): boolean => /^(https?:|mailto:)/i.test(href);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatus('loading');
-    const { error } = await supabase.from('contact_messages').insert([formState]);
-    if (!error) {
-      setStatus('success');
-      setFormState({ name: '', email: '', message: '' });
-      setTimeout(() => setStatus('idle'), 3000);
-    } else {
-      setStatus('error');
+const validateContactForm = (values: ContactFormValues): ContactFormErrors => {
+  const nextErrors: ContactFormErrors = {};
+
+  if (!values.name.trim()) {
+    nextErrors.name = 'Please enter your name.';
+  }
+
+  if (!values.email.trim()) {
+    nextErrors.email = 'Please enter your email address.';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
+    nextErrors.email = 'Please enter a valid email address.';
+  }
+
+  if (!values.message.trim()) {
+    nextErrors.message = 'Please share your project details.';
+  } else if (values.message.trim().length < 20) {
+    nextErrors.message = 'Please provide at least 20 characters for context.';
+  }
+
+  return nextErrors;
+};
+
+export default function App() {
+  const runtimeFlags = useMemo(() => getRuntimeFlags(), []);
+  const shouldRenderBookingScheduler = !(runtimeFlags.visualRegressionMode && runtimeFlags.forceButtonStates);
+
+  const [activeSection, setActiveSection] = useState('home');
+  const [mobileNavOpen, setMobileNavOpen] = useState(() => runtimeFlags.forceMobileNav);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(() => runtimeFlags.forceNavExpanded);
+  const [booting, setBooting] = useState(() => !runtimeFlags.visualRegressionMode);
+  const [contentReady, setContentReady] = useState(
+    () => runtimeFlags.visualRegressionMode && !runtimeFlags.forceSkeleton,
+  );
+  const [contactModalOpen, setContactModalOpen] = useState(
+    () => runtimeFlags.forceModal || runtimeFlags.forceValidation,
+  );
+  const [formValues, setFormValues] = useState<ContactFormValues>(() =>
+    runtimeFlags.forceValidation
+      ? {
+          name: '',
+          email: 'invalid-email',
+          message: 'Need help',
+        }
+      : initialContactValues,
+  );
+  const [formErrors, setFormErrors] = useState<ContactFormErrors>(() =>
+    runtimeFlags.forceValidation
+      ? validateContactForm({
+          name: '',
+          email: 'invalid-email',
+          message: 'Need help',
+        })
+      : {},
+  );
+  const [formAttempted, setFormAttempted] = useState(runtimeFlags.forceValidation);
+  const [formFeedback, setFormFeedback] = useState(
+    runtimeFlags.forceValidation ? 'Please fix validation errors before sending.' : '',
+  );
+  const [formStatus, setFormStatus] = useState<'idle' | 'error' | 'success'>(
+    runtimeFlags.forceValidation ? 'error' : 'idle',
+  );
+  const [blogsShouldLoad, setBlogsShouldLoad] = useState(() => runtimeFlags.visualRegressionMode);
+  const heatMapCells = useMemo(() => {
+    const total = 52 * 7;
+    return Array.from({ length: total }, (_, index) => getHeatValue(index + 1));
+  }, []);
+
+  const skeletonCards = useMemo(() => Array.from({ length: 4 }, (_, index) => index), []);
+  const skeletonBlogs = useMemo(() => Array.from({ length: 6 }, (_, index) => index), []);
+
+  const githubProfileHref =
+    socialHandles.find((item) => item.label === 'GitHub Profile')?.href ??
+    'https://github.com/Sartahkakaedar';
+  const repositoryHref =
+    socialHandles.find((item) => item.label === 'Main Repository')?.href ??
+    'https://github.com/Sartahkakaedar/On-Lookers-Founder-Portfolio-';
+  const issuesHref =
+    socialHandles.find((item) => item.label === 'Open Issues')?.href ??
+    'https://github.com/Sartahkakaedar/On-Lookers-Founder-Portfolio-/issues';
+  const emailHref =
+    socialHandles.find((item) => item.label === 'Email')?.href ??
+    'mailto:swarajmundhe22@gmail.com';
+
+  const { scrollYProgress } = useScroll();
+  const ambientY = useTransform(scrollYProgress, [0, 1], ['-8%', '22%']);
+  const ambientScale = useTransform(scrollYProgress, [0, 1], [1, 1.25]);
+  const heroY = useTransform(scrollYProgress, [0, 0.2], [0, -96]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.18], [1, 0.28]);
+  const heroLeadY = useTransform(scrollYProgress, [0, 0.2], [0, -58]);
+  const heroLeadOpacity = useTransform(scrollYProgress, [0, 0.17], [1, 0.22]);
+
+  useEffect(() => {
+    if (!booting) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setBooting(false), 940);
+    return () => window.clearTimeout(timeout);
+  }, [booting]);
+
+  useEffect(() => {
+    if (contentReady || runtimeFlags.forceSkeleton) {
+      return;
+    }
+
+    const delay = runtimeFlags.visualRegressionMode ? 0 : 680;
+    const timer = window.setTimeout(() => setContentReady(true), delay);
+    return () => window.clearTimeout(timer);
+  }, [contentReady, runtimeFlags.forceSkeleton, runtimeFlags.visualRegressionMode]);
+
+  useEffect(() => {
+    const targets = Array.from(document.querySelectorAll<HTMLElement>('[data-section]'));
+    if (targets.length === 0) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+          .forEach((entry) => {
+            const section = entry.target.getAttribute('data-section');
+            if (section) {
+              setActiveSection(section);
+            }
+          });
+      },
+      {
+        rootMargin: '-40% 0px -40% 0px',
+        threshold: [0.1, 0.35, 0.6],
+      },
+    );
+
+    targets.forEach((target) => observer.observe(target));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!contactModalOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setContactModalOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [contactModalOpen]);
+
+  useEffect(() => {
+    if (runtimeFlags.visualRegressionMode || blogsShouldLoad) {
+      return;
+    }
+
+    const section = document.getElementById('blogs');
+    if (!section) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setBlogsShouldLoad(true);
+        }
+      },
+      {
+        rootMargin: '0px',
+        threshold: 0.15,
+      },
+    );
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [blogsShouldLoad, runtimeFlags.visualRegressionMode]);
+
+  const goToSection = (id: string): void => {
+    const target = document.getElementById(id);
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setMobileNavOpen(false);
+    setMoreMenuOpen(false);
+  };
+
+  const openContactModal = (): void => {
+    setContactModalOpen(true);
+    setFormStatus('idle');
+    setFormFeedback('');
+  };
+
+  const updateFormField = (field: keyof ContactFormValues, value: string): void => {
+    setFormValues((current) => ({
+      ...current,
+      [field]: value,
+    }));
+
+    if (formAttempted) {
+      const nextValues = {
+        ...formValues,
+        [field]: value,
+      };
+      setFormErrors(validateContactForm(nextValues));
     }
   };
 
-  return (
-    <section id="contact" className="py-32 bg-black border-t border-zinc-900">
-      <div className="container mx-auto px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20">
-          <div>
-            <span className="text-zinc-500 uppercase tracking-widest text-sm mb-4 block">Get in touch</span>
-            <h2 className="text-5xl md:text-7xl font-display font-bold text-white mb-8">Let's build the future together.</h2>
-            <p className="text-zinc-400 text-lg mb-12 max-w-md">
-              Whether you have a groundbreaking idea or just want to discuss the future of technology, my door is always open.
-            </p>
-            
-            <div className="space-y-6">
-              <div className="flex items-center gap-4 text-zinc-300 hover:text-white transition-colors cursor-pointer">
-                <div className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center">
-                  <Mail size={20} />
-                </div>
-                <span>hello@swarajmundhe.com</span>
-              </div>
-              <div className="flex items-center gap-4 text-zinc-300 hover:text-white transition-colors cursor-pointer">
-                <div className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center">
-                  <Linkedin size={20} />
-                </div>
-                <span>linkedin.com/in/swarajmundhe</span>
-              </div>
-              <div className="flex items-center gap-4 text-zinc-300 hover:text-white transition-colors cursor-pointer">
-                <div className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center">
-                  <Twitter size={20} />
-                </div>
-                <span>@swarajmundhe_tech</span>
-              </div>
-            </div>
-          </div>
+  const onSubmitContactForm = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    setFormAttempted(true);
 
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="bg-zinc-900/50 p-8 md:p-12 rounded-sm border border-zinc-800"
-          >
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm uppercase tracking-widest text-zinc-500 mb-2">Name</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formState.name}
-                  onChange={(e) => setFormState({...formState, name: e.target.value})}
-                  className="w-full bg-transparent border-b border-zinc-800 py-3 focus:border-white transition-colors outline-none text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm uppercase tracking-widest text-zinc-500 mb-2">Email</label>
-                <input 
-                  type="email" 
-                  required
-                  value={formState.email}
-                  onChange={(e) => setFormState({...formState, email: e.target.value})}
-                  className="w-full bg-transparent border-b border-zinc-800 py-3 focus:border-white transition-colors outline-none text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm uppercase tracking-widest text-zinc-500 mb-2">Message</label>
-                <textarea 
-                  rows={4}
-                  required
-                  value={formState.message}
-                  onChange={(e) => setFormState({...formState, message: e.target.value})}
-                  className="w-full bg-transparent border-b border-zinc-800 py-3 focus:border-white transition-colors outline-none text-white resize-none"
-                />
-              </div>
-              <button 
-                type="submit"
-                disabled={status === 'loading'}
-                className="w-full py-4 bg-white text-black font-bold uppercase tracking-widest hover:bg-zinc-200 transition-all disabled:opacity-50"
-              >
-                {status === 'loading' ? 'Sending...' : status === 'success' ? 'Message Sent' : 'Send Message'}
-              </button>
-            </form>
-          </motion.div>
+    const errors = validateContactForm(formValues);
+    setFormErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setFormStatus('error');
+      setFormFeedback('Please correct the highlighted fields before submitting.');
+      return;
+    }
+
+    setFormStatus('success');
+    setFormFeedback('Thanks. Your message is ready to send via email.');
+
+    if (!runtimeFlags.visualRegressionMode) {
+      window.setTimeout(() => {
+        setContactModalOpen(false);
+        setFormValues(initialContactValues);
+        setFormErrors({});
+        setFormAttempted(false);
+        setFormStatus('idle');
+        setFormFeedback('');
+      }, 900);
+    }
+  };
+
+  const getFieldError = (field: keyof ContactFormErrors): string | undefined => {
+    if (!formAttempted) {
+      return undefined;
+    }
+
+    return formErrors[field];
+  };
+
+  return (
+    <>
+      <motion.div
+        className="boot-loader"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: booting ? 1 : 0, pointerEvents: booting ? 'auto' : 'none' }}
+        transition={{ duration: 0.42, ease: 'easeOut' }}
+      >
+        <div className="boot-loader__mark">{profileIdentity.monogram}</div>
+        <div className="boot-loader__bar">
+          <span className="boot-loader__fill" />
         </div>
-      </div>
-    </section>
-  );
-};
+      </motion.div>
 
-const Footer = () => (
-  <footer className="py-12 bg-black border-t border-zinc-900">
-    <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
-      <div className="text-zinc-500 text-sm tracking-widest uppercase">
-        © 2024 SWARAJ MUNDHE. ALL RIGHTS RESERVED.
-      </div>
-      <div className="flex gap-8">
-        <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Twitter size={20} /></a>
-        <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Linkedin size={20} /></a>
-        <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Github size={20} /></a>
-      </div>
-    </div>
-  </footer>
-);
+      <div className="portfolio-app">
+        <motion.div className="ambient-ring" style={{ y: ambientY, scale: ambientScale }} />
+        <div className="film-grain" aria-hidden="true" />
 
-export default function App() {
-  return (
-    <div className="bg-black min-h-screen text-white selection:bg-white selection:text-black font-sans">
-      <Navbar />
-      <main>
-        <Hero />
-        <VisionSection />
-        <ProjectsSection />
-        <ContactSection />
-      </main>
-      <Footer />
-    </div>
+        <header className="floating-header">
+          <a href="#home" className="brand-block" aria-label="Back to home">
+            <span className="brand-monogram">{profileIdentity.monogram}</span>
+            <span className="brand-copy">
+              <small>Creative Engineer</small>
+              <strong>Shipping Verified Quality</strong>
+            </span>
+          </a>
+
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            aria-label="Toggle navigation"
+            onClick={() => setMobileNavOpen((open) => !open)}
+          >
+            {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
+
+          <nav className={`nav-shell ${mobileNavOpen ? 'is-open' : ''}`}>
+            <div className="nav-pill">
+              {navLinks.map((link) => {
+                if (link.id === 'more') {
+                  return (
+                    <div className="more-anchor" key={link.id}>
+                      <button
+                        type="button"
+                        className={`nav-link ${activeSection === link.id || moreMenuOpen ? 'is-active' : ''}`}
+                        onClick={() => setMoreMenuOpen((open) => !open)}
+                      >
+                        {link.label}
+                      </button>
+                      <div className={`more-menu ${moreMenuOpen ? 'is-open' : ''}`}>
+                        <button type="button" onClick={() => goToSection('more')}>Presence</button>
+                        <button type="button" onClick={() => goToSection('work')}>Projects</button>
+                        <button type="button" onClick={() => goToSection('blogs')}>Insights</button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <button
+                    type="button"
+                    key={link.id}
+                    className={`nav-link ${activeSection === link.id ? 'is-active' : ''}`}
+                    onClick={() => goToSection(link.id)}
+                  >
+                    {link.label}
+                  </button>
+                );
+              })}
+
+              <button type="button" className="theme-button" aria-label="Toggle theme preview">
+                <MoonStar size={14} />
+              </button>
+
+              <button type="button" className="book-call-pill" onClick={() => goToSection('contact')}>
+                Book a Call
+              </button>
+            </div>
+          </nav>
+
+          <button type="button" className="cmd-badge" aria-label="Command menu">
+            <Command size={15} />
+          </button>
+        </header>
+
+        <main>
+          <section id="home" data-section="home" className="hero-section">
+            <motion.a
+              className="hero-callout"
+              href={githubProfileHref}
+              target="_blank"
+              rel="noreferrer"
+              initial={{ opacity: 0, y: -14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25, duration: 0.6, ease: cinematicEase }}
+            >
+              Building in public on GitHub
+            </motion.a>
+
+            <motion.h1
+              className="hero-title"
+              initial={{ opacity: 0, y: 34, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.86, ease: cinematicEase }}
+              style={{ y: heroY, opacity: heroOpacity }}
+            >
+              {profileIdentity.heroName}
+            </motion.h1>
+
+            <motion.p
+              className="hero-lead"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.75 }}
+              style={{ y: heroLeadY, opacity: heroLeadOpacity }}
+            >
+              I build digital products with <span>measurable quality gates.</span>
+            </motion.p>
+
+            <div className="hero-meta left">
+              <LocateFixed size={16} />
+              <p>
+                Based in {profileIdentity.locationShort},
+                <span>{profileIdentity.timezoneLabel}</span>
+              </p>
+            </div>
+
+            <div className="hero-meta right">
+              <Globe2 size={16} />
+              <p>
+                {profileIdentity.roleShort},
+                <span>design + engineering</span>
+              </p>
+            </div>
+          </section>
+
+          <section className="interface-grid" aria-label="Detail panels">
+            <motion.article
+              className="surface-card profile-surface"
+              initial={{ opacity: 0, y: 26, filter: 'blur(8px)' }}
+              whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ ...cardRevealTransition, delay: 0.02 }}
+            >
+              <header>
+                <h3>
+                  {profileIdentity.firstName} <span>{profileIdentity.lastName}</span>
+                </h3>
+                <p>
+                  {profileIdentity.locationShort} - {profileIdentity.timezoneLabel}
+                </p>
+              </header>
+              <Suspense fallback={<WidgetFallback className="widget-loading-placeholder-cube" />}>
+                <CubeWidget visualRegressionMode={runtimeFlags.visualRegressionMode} />
+              </Suspense>
+              <footer>
+                <a href={repositoryHref} target="_blank" rel="noreferrer" aria-label="Repository">
+                  <Linkedin size={16} />
+                </a>
+                <a href={githubProfileHref} target="_blank" rel="noreferrer" aria-label="GitHub">
+                  <Github size={16} />
+                </a>
+                <a href={issuesHref} target="_blank" rel="noreferrer" aria-label="Open issues">
+                  <Twitter size={16} />
+                </a>
+              </footer>
+            </motion.article>
+
+            <motion.article
+              className="surface-card focus-surface"
+              initial={{ opacity: 0, y: 26, filter: 'blur(8px)' }}
+              whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ ...cardRevealTransition, delay: 0.08 }}
+            >
+              <p className="caps">Precision-first product engineering</p>
+              <h3>
+                Interfaces
+                <span>that pass visual audits.</span>
+              </h3>
+              <p className="muted-copy">
+                {profileIdentity.roleLong}. Every release is validated for consistency, accessibility,
+                and cross-browser behavior before merge.
+              </p>
+              <div className="pill-row">
+                <span>Visual QA</span>
+                <span>Performance</span>
+                <span>Accessibility</span>
+                <span>Reliability</span>
+              </div>
+            </motion.article>
+
+            <motion.article
+              className="surface-card contact-surface"
+              initial={{ opacity: 0, y: 26, filter: 'blur(8px)' }}
+              whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ ...cardRevealTransition, delay: 0.14 }}
+            >
+              <p className="online-pill">{profileIdentity.availability}</p>
+              <h3>
+                Let&apos;s build a product
+                <span>that survives production.</span>
+              </h3>
+              <a className="mail-link" href={emailHref}>
+                {profileIdentity.email}
+              </a>
+              <button type="button" onClick={openContactModal}>Request collaboration</button>
+            </motion.article>
+
+            <motion.article
+              className="surface-card globe-surface"
+              initial={{ opacity: 0, y: 26, filter: 'blur(8px)' }}
+              whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ ...cardRevealTransition, delay: 0.18 }}
+            >
+              <p className="caps">Working across regions</p>
+              <h3>Distributed delivery with async-first workflows</h3>
+              <Suspense fallback={<WidgetFallback className="widget-loading-placeholder-globe" />}>
+                <GlobeWidget visualRegressionMode={runtimeFlags.visualRegressionMode} />
+              </Suspense>
+            </motion.article>
+
+            <motion.article
+              className="surface-card clock-surface"
+              initial={{ opacity: 0, y: 26, filter: 'blur(8px)' }}
+              whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ ...cardRevealTransition, delay: 0.24 }}
+            >
+              <Suspense fallback={<WidgetFallback className="widget-loading-placeholder-clock" />}>
+                <TimezoneClockWidget visualRegressionMode={runtimeFlags.visualRegressionMode} />
+              </Suspense>
+            </motion.article>
+
+            <motion.article
+              className="surface-card founder-surface"
+              initial={{ opacity: 0, y: 26, filter: 'blur(8px)' }}
+              whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ ...cardRevealTransition, delay: 0.28 }}
+            >
+              <p className="founder-copy">
+                Founder of <span>{profileIdentity.founderLabel}</span>
+              </p>
+              <p className="sub-script">Designing and shipping measurable web products</p>
+              <div className="phone-strip">
+                <div className="phone-mock" />
+                <div className="phone-mock tilt" />
+                <div className="phone-mock tilt-neg" />
+              </div>
+            </motion.article>
+          </section>
+
+          <SectionTitle
+            sectionId="about"
+            navSection="about"
+            eyebrow="Get to know more about"
+            title="ABOUT ME"
+            script="how i build."
+          />
+
+          <section className="about-section" aria-label="About and timeline">
+            <article className="timeline-card">
+              <div className="timeline-rail" />
+              <div className="timeline-items">
+                {timelineEntries.map((entry) => (
+                  <motion.article
+                    key={entry.title}
+                    className="timeline-item"
+                    initial={{ opacity: 0, x: 30 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, amount: 0.6 }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    <div className="timeline-head">
+                      <p>{entry.period}</p>
+                      <h3>{entry.title}</h3>
+                      <span>{entry.org}</span>
+                    </div>
+                    <div className="timeline-body">
+                      {entry.bullets.map((bullet) => (
+                        <p key={bullet}>{bullet}</p>
+                      ))}
+                    </div>
+                    <div className="timeline-tags">
+                      {entry.tags.map((tag) => (
+                        <span key={tag}>{tag}</span>
+                      ))}
+                    </div>
+                  </motion.article>
+                ))}
+              </div>
+            </article>
+
+            <article className="skills-section">
+              <Suspense fallback={<WidgetFallback className="widget-loading-placeholder-stack" />}>
+                <StackAnimationScene visualRegressionMode={runtimeFlags.visualRegressionMode} />
+              </Suspense>
+              <p className="caps">My skillset</p>
+              <h3>
+                The Stack <span>Behind</span>
+              </h3>
+              <div className="skills-pills">
+                {stackTags.map((tag) => (
+                  <span key={tag}>{tag}</span>
+                ))}
+              </div>
+            </article>
+
+            <article className="heatmap-section">
+              <p className="caps">My code journey</p>
+              <h3>
+                Delivery Activity
+                <span>&amp;&amp; open contribution</span>
+              </h3>
+              <div className="heatmap-grid" aria-label="Contribution heatmap">
+                {heatMapCells.map((value, index) => (
+                  <i
+                    key={`heat-${index}`}
+                    style={{
+                      opacity: 0.3 + value * 0.7,
+                      backgroundColor: `rgb(${18 + value * 28}, ${54 + value * 185}, ${42 + value * 82})`,
+                    }}
+                  />
+                ))}
+              </div>
+            </article>
+          </section>
+
+          <SectionTitle
+            sectionId="work-intro"
+            eyebrow="Crafting digital experiences"
+            title="MY WORKS"
+            script="through systems &amp; code."
+          />
+
+          <section id="work" data-section="work" className="works-section" aria-label="Selected work">
+            <div className="work-grid">
+              {contentReady
+                ? workItems.map((item, index) => (
+                    <motion.article
+                      key={item.title}
+                      className={`work-card accent-${item.accent}`}
+                      initial={{ opacity: 0, y: 24 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.3 }}
+                      transition={{ duration: 0.72, delay: index * 0.06, ease: cinematicEase }}
+                    >
+                      <p>{item.category}</p>
+                      <h3>{item.title}</h3>
+                      <p className="desc">{item.description}</p>
+                      <div className="work-meta">
+                        <div className="work-stack">
+                          {item.stack.map((skill) => (
+                            <span key={`${item.title}-${skill}`}>{skill}</span>
+                          ))}
+                        </div>
+                        <p className="work-outcome">{item.outcome}</p>
+                      </div>
+                      <div className="work-showcase" aria-hidden="true">
+                        <div className="showcase-phone primary" />
+                        <div className="showcase-phone secondary" />
+                        <div className="showcase-browser">
+                          <span />
+                          <span />
+                          <span />
+                        </div>
+                      </div>
+                      <a href={item.href} target="_blank" rel="noreferrer">
+                        View repository <ArrowUpRight size={16} />
+                      </a>
+                    </motion.article>
+                  ))
+                : skeletonCards.map((index) => (
+                    <article key={`work-skeleton-${index}`} className="work-card skeleton-card" aria-hidden="true">
+                      <div className="skeleton-line short" />
+                      <div className="skeleton-line title" />
+                      <div className="skeleton-line" />
+                      <div className="skeleton-line" />
+                      <div className="skeleton-line button" />
+                    </article>
+                  ))}
+            </div>
+
+            <article className="logic-band">
+              <p className="caps">Behind the curtains</p>
+              <h3>
+                Decoding logic
+                <span>&amp;&amp; release confidence</span>
+              </h3>
+            </article>
+          </section>
+
+          <section className="voices-section" aria-label="Testimonials">
+            <p className="caps">Validation signals</p>
+            <h3>
+              The Voices <span>Behind</span>
+            </h3>
+            <div className="voices-grid">
+              {testimonials.map((item) => (
+                <article key={item.name} className="voice-card">
+                  <header>
+                    <div>
+                      <h4>{item.name}</h4>
+                      <p>{item.role}</p>
+                    </div>
+                    <ArrowUpRight size={18} />
+                  </header>
+                  <p>{item.quote}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <SectionTitle
+            sectionId="blogs"
+            navSection="blogs"
+            eyebrow="Insights i share"
+            title="BLOGS"
+            script="engineering notes."
+          />
+
+          <section className="blogs-section" aria-label="Blog previews">
+            {blogsShouldLoad ? (
+              <Suspense
+                fallback={
+                  <div className="blogs-grid" aria-hidden="true">
+                    {skeletonBlogs.map((index) => (
+                      <article key={`blog-lazy-skeleton-${index}`} className="blog-card skeleton-card">
+                        <div className="skeleton-line short" />
+                        <div className="skeleton-line title" />
+                        <div className="skeleton-line" />
+                        <div className="skeleton-line" />
+                      </article>
+                    ))}
+                  </div>
+                }
+              >
+                <DynamicBlogCards
+                  contentReady={contentReady}
+                  skeletonIndexes={skeletonBlogs}
+                  visualRegressionMode={runtimeFlags.visualRegressionMode}
+                />
+              </Suspense>
+            ) : (
+              <div className="blogs-grid" aria-hidden="true">
+                {skeletonBlogs.map((index) => (
+                  <article key={`blog-deferred-skeleton-${index}`} className="blog-card skeleton-card">
+                    <div className="skeleton-line short" />
+                    <div className="skeleton-line title" />
+                    <div className="skeleton-line" />
+                    <div className="skeleton-line" />
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section id="more" data-section="more" className="presence-section">
+            <motion.div
+              className="presence-headline"
+              initial={{ opacity: 0, y: 26, filter: 'blur(8px)' }}
+              whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ ...cardRevealTransition, delay: 0.05 }}
+            >
+              <div>
+                <p className="caps">My digital presence</p>
+                <h3>
+                  <span>MY</span> DIGITAL
+                  <strong>PRESENCE</strong>
+                </h3>
+              </div>
+              <div className="presence-avatar">
+                <img src="/project-4.jpg" alt={`${profileIdentity.firstName} portrait`} />
+              </div>
+            </motion.div>
+
+            <div className="presence-divider" />
+
+            <div className="presence-links">
+              {socialHandles.map((item, index) => (
+                <motion.a
+                  key={item.label}
+                  href={item.href}
+                  target={isExternalHref(item.href) ? '_blank' : undefined}
+                  rel={isExternalHref(item.href) ? 'noreferrer' : undefined}
+                  className={`presence-row ${index === 0 ? 'is-primary' : ''}`}
+                  initial={{ opacity: 0, y: 22 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.35 }}
+                  transition={{ duration: 0.58, delay: 0.06 + index * 0.06, ease: cinematicEase }}
+                >
+                  <small>{String(index + 1).padStart(2, '0')}</small>
+                  <span>{item.label.toUpperCase()}</span>
+                  <small className="presence-description">{item.description}</small>
+                  <i>
+                    <ArrowUpRight size={16} />
+                  </i>
+                </motion.a>
+              ))}
+            </div>
+          </section>
+
+          <section id="contact" className="book-call-section" aria-label="Book a call">
+            <div className="book-copy">
+              <p>Schedule / Scope / Build</p>
+              <h2>
+                BOOK A
+                <span>CALL</span>
+                WITH ME
+              </h2>
+              <div className="book-actions">
+                <button type="button" className="primary-action" onClick={openContactModal}>
+                  <CheckCircle2 size={16} /> Start a Project
+                </button>
+                <button type="button" className="ghost-action" onClick={openContactModal}>
+                  <MessageCircle size={16} /> Send a Message
+                </button>
+              </div>
+
+              {runtimeFlags.visualRegressionMode || runtimeFlags.forceButtonStates ? (
+                <div className="button-state-lab" aria-label="Button interaction states">
+                  <button type="button" className="primary-action state-default">Default</button>
+                  <button type="button" className="primary-action state-hover">Hover</button>
+                  <button type="button" className="primary-action state-active">Active</button>
+                  <button type="button" className="primary-action state-focus">Focus</button>
+                </div>
+              ) : null}
+            </div>
+            {shouldRenderBookingScheduler ? (
+              <Suspense fallback={<WidgetFallback className="widget-loading-placeholder-booking" />}>
+                <BookingScheduler visualRegressionMode={runtimeFlags.visualRegressionMode} />
+              </Suspense>
+            ) : (
+              <WidgetFallback className="widget-loading-placeholder-booking" />
+            )}
+          </section>
+        </main>
+
+        {contactModalOpen ? (
+          <div className="contact-modal-overlay" role="presentation" onClick={() => setContactModalOpen(false)}>
+            <motion.section
+              className="contact-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="contact-modal-title"
+              initial={{ opacity: 0, y: 14, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 14, scale: 0.98 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="contact-modal-header">
+                <div>
+                  <p>Contact Form</p>
+                  <h3 id="contact-modal-title">Project Discovery</h3>
+                </div>
+                <button type="button" className="modal-close" onClick={() => setContactModalOpen(false)}>
+                  <X size={16} />
+                </button>
+              </header>
+
+              <form className="contact-form" noValidate onSubmit={onSubmitContactForm}>
+                <div className="form-grid">
+                  <label className={`field ${getFieldError('name') ? 'has-error' : ''}`}>
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formValues.name}
+                      onChange={(event) => updateFormField('name', event.target.value)}
+                      placeholder="Your full name"
+                    />
+                    {getFieldError('name') ? <small className="field-error">{getFieldError('name')}</small> : null}
+                  </label>
+
+                  <label className={`field ${getFieldError('email') ? 'has-error' : ''}`}>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formValues.email}
+                      onChange={(event) => updateFormField('email', event.target.value)}
+                      placeholder="you@company.com"
+                    />
+                    {getFieldError('email') ? <small className="field-error">{getFieldError('email')}</small> : null}
+                  </label>
+                </div>
+
+                <label className={`field ${getFieldError('message') ? 'has-error' : ''}`}>
+                  <span>Project Brief</span>
+                  <textarea
+                    name="message"
+                    rows={5}
+                    value={formValues.message}
+                    onChange={(event) => updateFormField('message', event.target.value)}
+                    placeholder="Tell me about your product goals, timeline, and quality targets."
+                  />
+                  {getFieldError('message') ? <small className="field-error">{getFieldError('message')}</small> : null}
+                </label>
+
+                {formFeedback ? (
+                  <p className={`form-feedback ${formStatus}`} aria-live="polite">
+                    {formStatus === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
+                    <span>{formFeedback}</span>
+                  </p>
+                ) : null}
+
+                <div className="form-actions">
+                  <button type="submit" className="primary-action">
+                    <Send size={15} /> Validate & Prepare Message
+                  </button>
+                  <a className="ghost-action secondary-action" href={emailHref}>
+                    <Mail size={15} /> Send via Email Client
+                  </a>
+                </div>
+              </form>
+            </motion.section>
+          </div>
+        ) : null}
+
+        <footer className="site-footer">
+          <section className="footer-cta">
+            <p>
+              Let&apos;s ship
+              <span>something precise.</span>
+            </p>
+            <div className="footer-orb" />
+          </section>
+
+          <section className="footer-grid">
+            <article>
+              <h4>{profileIdentity.heroName}</h4>
+              <p>
+                Building digital experiences that are measurable, accessible, and reliable at launch.
+                Every interaction is engineered for production confidence.
+              </p>
+            </article>
+
+            {footerGroups.map((group) => (
+              <article key={group.title}>
+                <h5>{group.title}</h5>
+                {group.links.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target={isExternalHref(link.href) ? '_blank' : undefined}
+                    rel={isExternalHref(link.href) ? 'noreferrer' : undefined}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </article>
+            ))}
+          </section>
+
+          <section className="footer-bottom">
+            <small>© 2026 {profileIdentity.copyrightName}. All rights reserved.</small>
+            <div>
+              <a href={githubProfileHref} target="_blank" rel="noreferrer" aria-label="GitHub">
+                <Github size={16} />
+              </a>
+              <a href={repositoryHref} target="_blank" rel="noreferrer" aria-label="Repository">
+                <Linkedin size={16} />
+              </a>
+              <a href={issuesHref} target="_blank" rel="noreferrer" aria-label="Open issues">
+                <X size={16} />
+              </a>
+              <a href={emailHref} aria-label="Email">
+                <Mail size={16} />
+              </a>
+              <a href="#contact" aria-label="Share">
+                <Send size={16} />
+              </a>
+              <a href={repositoryHref} target="_blank" rel="noreferrer" aria-label="Open repository">
+                <ExternalLink size={16} />
+              </a>
+            </div>
+          </section>
+        </footer>
+      </div>
+    </>
   );
 }

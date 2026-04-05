@@ -1,0 +1,63 @@
+name: Visual Regression
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  visual-regression:
+    name: Visual Regression Gate
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm.cmd ci
+
+      - name: Install Playwright browsers
+        run: npx.cmd playwright install chromium firefox webkit
+
+      - name: Build production bundle
+        run: npm.cmd run build
+
+      - name: Generate baseline screenshots (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npm.cmd run test:visual:update
+
+      - name: Validate visual snapshots (pull requests)
+        if: github.event_name == 'pull_request'
+        run: npm.cmd run test:visual
+
+      - name: Run cross-browser smoke suite
+        run: npm.cmd run test:smoke
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            playwright-report
+            test-results
+          retention-days: 14
+
+      - name: Upload baseline snapshots (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-${{ github.run_id }}
+          path: tests/visual-regression.spec.ts-snapshots
+          retention-days: 14

@@ -1,16 +1,36 @@
-import supabase from './_supabase.js';
+import { isSupabaseConfigured, requireSupabase } from './_supabase.js';
+import { createSecureHandler } from './_security.js';
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).end();
+export default createSecureHandler(
+  {
+    methods: ['GET'],
+    auth: 'none',
+    rateLimit: {
+      windowMs: 60_000,
+      max: 120,
+    },
+  },
+  async (_req, res, { requestId }) => {
+    if (!isSupabaseConfigured) {
+      return res.status(503).json({
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Projects service is not configured.',
+          requestId,
+        },
+      });
+    }
 
-  try {
-    const { data, error } = await supabase.from('projects').select('*').order('year', { ascending: false });
-    if (error) throw error;
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-}
+    const supabase = requireSupabase();
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('year', { ascending: false });
+
+    if (error) {
+      throw new Error(`PROJECTS_QUERY_FAILED:${error.message}`);
+    }
+
+    return res.status(200).json(data ?? []);
+  },
+);

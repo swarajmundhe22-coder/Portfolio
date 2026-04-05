@@ -1,45 +1,80 @@
-@import "tailwindcss";
-
-@theme {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Clash Display', 'Inter', system-ui, sans-serif;
-}
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500;1,700&display=swap');
 
 :root {
   color-scheme: dark;
+
+  --font-sans: 'Satoshi', 'Inter', 'Segoe UI', sans-serif;
+  --font-serif: 'Playfair Display', 'Times New Roman', serif;
+
+  --bg-page: #000000;
+  --bg-surface: #090a0d;
+  --text-primary: #f1f3f8;
+  --text-secondary: #a3a8b1;
+
+  --accent-magenta: #d30591;
+  --accent-blue: #2828c0;
+  --accent-red: #880818;
+  --accent-amber: #b03008;
+
+  --radius-card: 1.25rem;
+  --radius-pill: 999px;
+
+  --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.34);
+  --border-muted: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background-color: #000;
-  color: #fff;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
+a,
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+::selection {
+  background: #ffffff;
+  color: #0b0b10;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 9px;
+  height: 9px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #000;
+  background: #06070a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #222;
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #333;
-}
-
-/* Cinematic text effects */
-.text-glow {
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-}
-
-.bg-grid {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-  background-size: 40px 40px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2a2d36, #17181f);
 }

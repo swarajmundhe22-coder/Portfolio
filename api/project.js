@@ -1,20 +1,47 @@
-import supabase from './_supabase.js';
+import { isSupabaseConfigured, requireSupabase } from './_supabase.js';
+import { createSecureHandler } from './_security.js';
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).end();
+export default createSecureHandler(
+  {
+    methods: ['GET'],
+    auth: 'none',
+    rateLimit: {
+      windowMs: 60_000,
+      max: 100,
+    },
+  },
+  async (_req, res, { requestId }) => {
+    if (!isSupabaseConfigured) {
+      return res.status(503).json({
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Project detail service is not configured.',
+          requestId,
+        },
+      });
+    }
 
-  try {
-    const { data: info } = await supabase.from('project_info').select('*').single();
-    const { data: report } = await supabase.from('report_content').select('*').order('order_index', { ascending: true });
-    const { data: timeline } = await supabase.from('timeline_events').select('*').order('date', { ascending: true });
-    const { data: bom } = await supabase.from('bom_items').select('*').order('id', { ascending: true });
-    const { data: slides } = await supabase.from('slides').select('*').order('order_index', { ascending: true });
+    const supabase = requireSupabase();
 
-    res.status(200).json({ info, report, timeline, bom, slides });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-}
+    const [{ data: info, error: infoError }, { data: report, error: reportError }, { data: timeline, error: timelineError }, { data: bom, error: bomError }, { data: slides, error: slidesError }] = await Promise.all([
+      supabase.from('project_info').select('*').single(),
+      supabase.from('report_content').select('*').order('order_index', { ascending: true }),
+      supabase.from('timeline_events').select('*').order('date', { ascending: true }),
+      supabase.from('bom_items').select('*').order('id', { ascending: true }),
+      supabase.from('slides').select('*').order('order_index', { ascending: true }),
+    ]);
+
+    const firstError = infoError || reportError || timelineError || bomError || slidesError;
+    if (firstError) {
+      throw new Error(`PROJECT_QUERY_FAILED:${firstError.message}`);
+    }
+
+    return res.status(200).json({
+      info,
+      report: report ?? [],
+      timeline: timeline ?? [],
+      bom: bom ?? [],
+      slides: slides ?? [],
+    });
+  },
+);
