@@ -289,12 +289,13 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
 
   return (
     <div className={`globe-widget ${className || ''}`.trim()}>
-      <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="globe-svg"
-        role="img"
-        aria-label="Interactive globe feed"
-      >
+      <div className="globe-stage">
+        <svg
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          className="globe-svg"
+          role="img"
+          aria-label="Interactive globe feed"
+        >
         <defs>
           <radialGradient id="globeGlow" cx="50%" cy="45%" r="60%">
             <stop offset="0%" stopColor="#2a4f96" stopOpacity="0.26" />
@@ -317,7 +318,10 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
         <path d={graticulePath} fill="none" stroke="#1f2f4f" strokeOpacity={0.45} strokeWidth={1} />
 
         {arcs.map((arc) => (
-          <path key={arc.id} d={arc.d} fill="none" stroke="#4e85ff" strokeOpacity={0.68} strokeWidth={2.8} />
+          <g key={arc.id}>
+            <path d={arc.d} className="globe-route-glow" />
+            <path d={arc.d} className="globe-route-core" />
+          </g>
         ))}
 
         {visiblePoints.map((point) => {
@@ -364,7 +368,7 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
         {labelAnchors.map((anchor) => (
           <div
             key={`label-${anchor.code}`}
-            className="globe-label-panel"
+            className="globe-label-chip"
             data-render-order={anchor.renderOrder}
             style={{
               left: `${anchor.xPercent}%`,
@@ -373,18 +377,13 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
               zIndex: anchor.renderOrder,
             }}
           >
-            <span>{anchor.label}</span>
+            {anchor.label}
           </div>
         ))}
       </div>
-
-      {tooltipCode && tooltipMetric ? (
-        <div className="globe-tooltip" role="status" aria-live="polite">
-          <strong>{tooltipMetric.name}</strong>
-          <span>{Math.round(effectiveValues[tooltipCode]).toLocaleString()}</span>
-        </div>
-      ) : null}
-
+    </div>
+    
+    <aside className="globe-sidebar">
       <div className="globe-country-pills" role="tablist" aria-label="Region focus">
         {REGION_POINTS.map((point) => (
           <button
@@ -403,16 +402,14 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
         ))}
       </div>
 
-      <aside className="globe-summary" aria-label="Country summary">
-        <p>
+      <div className="globe-remote-readout" aria-live="polite">
+        <div className="globe-remote-head">
+          <span className="globe-remote-pin" aria-hidden="true" />
           <span>LIVE FEED</span>
-          {selectedMetric.name}
-        </p>
+        </div>
         <strong>{selectedDisplayValue.toLocaleString()}</strong>
-        <button type="button" onClick={() => setZoomed((current) => !current)}>
-          {zoomed ? 'Reset View' : 'Zoom Region'}
-        </button>
-      </aside>
+      </div>
+    </aside>
     </div>
   );
 };
