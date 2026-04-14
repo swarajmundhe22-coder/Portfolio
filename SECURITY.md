@@ -1,4 +1,4 @@
-# Security Architecture
+# Security Architecture.
 
 This project uses a defense-in-depth backend security model for all serverless API routes.
 
