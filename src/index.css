@@ -22,6 +22,30 @@
 
   --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.34);
   --border-muted: 1px solid rgba(255, 255, 255, 0.08);
+
+  --mode-transition-duration: 280ms;
+  --interface-brightness-scale: 1;
+  --interface-contrast-scale: 1.03;
+}
+
+:root[data-brightness-mode='enterprise'] {
+  --bg-page: #000000;
+  --bg-surface: #090a0d;
+  --text-primary: #f1f3f8;
+  --text-secondary: #a9afba;
+
+  --interface-brightness-scale: 1;
+  --interface-contrast-scale: 1.03;
+}
+
+:root[data-brightness-mode='enhanced-visibility'] {
+  --bg-page: #05070d;
+  --bg-surface: #0f131d;
+  --text-primary: #f5f8ff;
+  --text-secondary: #c0c7d2;
+
+  --interface-brightness-scale: 1.1;
+  --interface-contrast-scale: 1.08;
 }
 
 * {
@@ -42,6 +66,9 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color var(--mode-transition-duration) ease,
+    color var(--mode-transition-duration) ease;
 }
 
 a,
@@ -78,3 +105,47 @@ img {
   border-radius: 999px;
   background: linear-gradient(180deg, #2a2d36, #17181f);
 }
+
+/* --- Cinematic Audit Enhancements --- */
+:root {
+  --cinematic-grade-shadow: rgba(0, 0, 0, 0.45);
+  --cinematic-grade-highlight: rgba(255, 255, 255, 0.05);
+  --cinematic-transition-speed: 0.8s;
+  --cinematic-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --scroll-percent: 0;
+  --grain-opacity: 0.25;
+  --cinematic-hue-shift: 0deg;
+  --cinematic-scroll-hue: 0deg;
+  --cinematic-saturation: 1;
+  --cinematic-lift: 1;
+  --cinematic-audio-pulse: 0;
+  --realtime-color-grade-r: 255;
+  --realtime-color-grade-g: 255;
+  --realtime-color-grade-b: 255;
+}
+
+/* GPU-accelerated transform layers without DOM changes */
+.surface-card,
+.work-card,
+.blog-card,
+.voice-float-card,
+.presence-row,
+.route-transition-shell {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Data-attribute hooks for animation controllers */
+[data-cinematic-hook] {
+  transition: opacity var(--cinematic-transition-speed) var(--cinematic-ease),
+              transform var(--cinematic-transition-speed) var(--cinematic-ease),
+              filter var(--cinematic-transition-speed) var(--cinematic-ease);
+}
+
+[data-cinematic-state='active'] {
+  /* Real-time color grading overlay via CSS vars */
+  box-shadow:
+    0 10px 40px var(--cinematic-grade-shadow),
+    inset 0 0 0 1px var(--cinematic-grade-highlight);
+}
+

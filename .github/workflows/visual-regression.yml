@@ -7,6 +7,16 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      update_storybook_baselines:
+        description: 'Update canonical Storybook baselines'
+        required: false
+        default: 'false'
+      baseline_approved:
+        description: 'Approval gate for baseline updates'
+        required: false
+        default: 'false'
 
 jobs:
   visual-regression:
@@ -30,19 +40,33 @@ jobs:
       - name: Install Playwright browsers
         run: npx.cmd playwright install chromium firefox webkit
 
-      - name: Build production bundle
-        run: npm.cmd run build
+      - name: Validate baseline approval gate
+        if: github.event_name == 'workflow_dispatch' && inputs.update_storybook_baselines == 'true' && inputs.baseline_approved != 'true'
+        run: |
+          echo Baseline update was requested without approval.
+          exit 1
 
-      - name: Generate baseline screenshots (main)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: npm.cmd run test:visual:update
+      - name: Storybook canonical visual check
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        run: npm.cmd run test:storybook:visual
 
-      - name: Validate visual snapshots (pull requests)
-        if: github.event_name == 'pull_request'
-        run: npm.cmd run test:visual
+      - name: Storybook canonical baseline update
+        if: github.event_name == 'workflow_dispatch' && inputs.update_storybook_baselines == 'true' && inputs.baseline_approved == 'true'
+        env:
+          BASELINE_APPROVED: '1'
+        run: npm.cmd run test:storybook:visual:update
+
+      - name: Controlled Playwright video visual matrix
+        run: npm.cmd run test:video:visual:matrix
 
       - name: Run cross-browser smoke suite
         run: npm.cmd run test:smoke
+
+      - name: Lighthouse CI quality gate
+        run: npm.cmd run quality:lighthouse:ci
+
+      - name: Run strict FPS matrix gate
+        run: npm.cmd run perf:fps:ci
 
       - name: Upload Playwright report
         if: always()
@@ -54,8 +78,29 @@ jobs:
             test-results
           retention-days: 14
 
-      - name: Upload baseline snapshots (main)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Upload Storybook canonical baselines
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-canonical-${{ github.run_id }}
+          path: |
+            tests/storybook-canonical-baselines
+            test-results/visual/storybook-canonical
+          retention-days: 14
+
+      - name: Upload FPS matrix artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fps-matrix-${{ github.run_id }}
+          path: |
+            analysis/perf/fps-matrix-report.json
+            analysis/perf/fps-matrix-comparison.json
+            docs/fps-p0-remediation-before-after.md
+          retention-days: 14
+
+      - name: Upload visual baseline snapshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: visual-baselines-${{ github.run_id }}

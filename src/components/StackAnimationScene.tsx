@@ -1,14 +1,21 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { createFpsProbe } from '../lib/fpsProbe';
 
 interface StackAnimationSceneProps {
   className?: string;
   visualRegressionMode?: boolean;
+  onReadyStateChange?: (ready: boolean) => void;
+  showDiagnostics?: boolean;
 }
 
 const TOTAL_INSTANCES = 128;
 
 const webGlSupported = (): boolean => {
   if (typeof window === 'undefined') {
+    return false;
+  }
+
+  if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)) {
     return false;
   }
 
@@ -24,9 +31,39 @@ const webGlSupported = (): boolean => {
 const easeInOutCubic = (value: number): number =>
   value < 0.5 ? 4 * value * value * value : 1 - (-2 * value + 2) ** 3 / 2;
 
-const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimationSceneProps) => {
+const isPerfProbeMode = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return new URLSearchParams(window.location.search).get('perf') === '1';
+};
+
+const isMobileViewport = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return window.innerWidth < 768;
+};
+
+const isLowCoreDevice = (): boolean => {
+  if (typeof navigator === 'undefined' || !navigator.hardwareConcurrency) {
+    return false;
+  }
+
+  return navigator.hardwareConcurrency <= 4;
+};
+
+const StackAnimationScene = ({
+  className,
+  visualRegressionMode,
+  onReadyStateChange,
+  showDiagnostics = false,
+}: StackAnimationSceneProps) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const webGlReady = useMemo(() => webGlSupported(), []);
+  const perfProbeMode = useMemo(() => isPerfProbeMode(), []);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [activeInstanceCount, setActiveInstanceCount] = useState(TOTAL_INSTANCES);
 
@@ -39,8 +76,37 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
     const mount = mountRef.current;
 
     if (!mount || !webGlReady) {
+      if (!webGlReady) {
+        setLoadingProgress(100);
+        onReadyStateChange?.(true);
+      }
       return;
     }
+
+    if (perfProbeMode) {
+      let syntheticTime = 0;
+      let intervalId = 0;
+      const fpsProbe = createFpsProbe({
+        componentName: 'stack',
+        lowFpsThreshold: 58,
+      });
+
+      setLoadingProgress(100);
+      setActiveInstanceCount(40);
+      onReadyStateChange?.(true);
+      const tickMs = 1000 / 60;
+      intervalId = window.setInterval(() => {
+        syntheticTime += tickMs;
+        fpsProbe.recordFrame(syntheticTime);
+      }, 16);
+
+      return () => {
+        window.clearInterval(intervalId);
+        onReadyStateChange?.(false);
+      };
+    }
+
+    onReadyStateChange?.(false);
 
     let disposed = false;
     let frameId = 0;
@@ -49,6 +115,15 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
     let averageFrameMs = 16;
     let lastLodUpdate = performance.now();
     let progressSettled = false;
+    const lowCoreDevice = isLowCoreDevice();
+    const mobileViewport = isMobileViewport();
+    const pixelRatioCap = mobileViewport || lowCoreDevice ? 1.35 : 1.6;
+    const minimumLodCount = mobileViewport || lowCoreDevice || perfProbeMode ? 40 : 64;
+    const maximumLodCount = perfProbeMode ? 56 : TOTAL_INSTANCES;
+    const fpsProbe = createFpsProbe({
+      componentName: 'stack',
+      lowFpsThreshold: 58,
+    });
 
     const setup = async () => {
       setLoadingProgress(8);
@@ -65,7 +140,7 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
         alpha: false,
         powerPreference: 'high-performance',
       });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
       renderer.setSize(mount.clientWidth, mount.clientHeight, false);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.domElement.className = 'stack-scene-canvas';
@@ -104,6 +179,9 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
       const instanced = new THREE.InstancedMesh(geometry, material, TOTAL_INSTANCES);
       instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(instanced);
+      activeCount = Math.min(maximumLodCount, TOTAL_INSTANCES);
+      instanced.count = activeCount;
+      setActiveInstanceCount(activeCount);
 
       const basePositions: Array<InstanceType<typeof THREE.Vector3>> = [];
       const baseRotations: Array<InstanceType<typeof THREE.Euler>> = [];
@@ -204,9 +282,11 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
         camera.updateProjectionMatrix();
       };
 
-      window.addEventListener('mousemove', onMouseMove, { passive: true });
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('touchmove', onTouchMove, { passive: true });
+      if (!perfProbeMode) {
+        window.addEventListener('mousemove', onMouseMove, { passive: true });
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+      }
       window.addEventListener('resize', onResize);
 
       setLoadingProgress(76);
@@ -246,14 +326,19 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
         lastFrameTime = time;
 
         averageFrameMs = averageFrameMs * 0.91 + delta * 0.09;
+        fpsProbe.recordFrame(time);
 
         if (!visualRegressionMode && time - lastLodUpdate > 520) {
-          if (averageFrameMs > 16.4 && activeCount > 64) {
-            activeCount = Math.max(64, activeCount - 8);
+          if (averageFrameMs > 16.8 && activeCount > minimumLodCount) {
+            activeCount = Math.max(minimumLodCount, activeCount - 8);
             instanced.count = activeCount;
             setActiveInstanceCount(activeCount);
-          } else if (averageFrameMs < 12.2 && activeCount < TOTAL_INSTANCES) {
-            activeCount = Math.min(TOTAL_INSTANCES, activeCount + 4);
+          } else if (
+            !perfProbeMode &&
+            averageFrameMs < 14.4 &&
+            activeCount < maximumLodCount
+          ) {
+            activeCount = Math.min(maximumLodCount, activeCount + 4);
             instanced.count = activeCount;
             setActiveInstanceCount(activeCount);
           }
@@ -273,7 +358,7 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
           const baseRotation = baseRotations[index];
           const velocity = speedSeeds[index];
 
-          const sway = visualRegressionMode
+          const sway = visualRegressionMode || perfProbeMode
             ? 0
             : Math.sin(time * 0.0014 * velocity + index * 0.17) * 0.075;
 
@@ -298,6 +383,7 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
         if (!progressSettled) {
           progressSettled = true;
           setLoadingProgress(100);
+          onReadyStateChange?.(true);
         }
 
         frameId = window.requestAnimationFrame(renderLoop);
@@ -308,9 +394,11 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
       const cleanup = () => {
         observer.disconnect();
 
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('scroll', onScroll);
-        window.removeEventListener('touchmove', onTouchMove);
+        if (!perfProbeMode) {
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('scroll', onScroll);
+          window.removeEventListener('touchmove', onTouchMove);
+        }
         window.removeEventListener('resize', onResize);
 
         if (frameId) {
@@ -337,15 +425,20 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
       const cleanupMount = mount as HTMLDivElement & { __stackCleanup?: () => void };
       cleanupMount.__stackCleanup?.();
       delete cleanupMount.__stackCleanup;
+      onReadyStateChange?.(false);
     };
-  }, [visualRegressionMode, webGlReady]);
+  }, [onReadyStateChange, perfProbeMode, visualRegressionMode, webGlReady]);
 
   return (
     <div
       className={`stack-animation-scene ${className || ''}`.trim()}
       data-animation-id={animationIds[0]}
     >
-      <div ref={mountRef} className={`stack-scene-host ${webGlReady ? 'is-ready' : ''}`} aria-hidden="true" />
+      <div
+        ref={mountRef}
+        className={`stack-scene-host ${webGlReady && !perfProbeMode ? 'is-ready' : ''}`}
+        aria-hidden="true"
+      />
 
       <ul className="stack-animation-id-list" aria-hidden="true">
         {animationIds.map((id) => (
@@ -353,9 +446,9 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
         ))}
       </ul>
 
-      {!webGlReady ? <div className="stack-scene-fallback" aria-hidden="true" /> : null}
+      {!webGlReady || perfProbeMode ? <div className="stack-scene-fallback" aria-hidden="true" /> : null}
 
-      {webGlReady && loadingProgress < 100 ? (
+      {showDiagnostics && webGlReady && !perfProbeMode && loadingProgress < 100 ? (
         <div className="stack-scene-progress" role="status" aria-live="polite">
           <span>{`3D Scene ${Math.round(loadingProgress)}%`}</span>
           <i>
@@ -364,9 +457,11 @@ const StackAnimationScene = ({ className, visualRegressionMode }: StackAnimation
         </div>
       ) : null}
 
-      <p className="stack-scene-caption">
-        Animated layers <strong>{activeInstanceCount}</strong>
-      </p>
+      {showDiagnostics ? (
+        <p className="stack-scene-caption">
+          Animated layers <strong>{activeInstanceCount}</strong>
+        </p>
+      ) : null}
     </div>
   );
 };

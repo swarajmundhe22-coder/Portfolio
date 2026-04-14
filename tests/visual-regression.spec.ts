@@ -52,8 +52,19 @@ for (const viewport of viewports) {
     });
     await expect(page.locator('.hero-section')).toHaveScreenshot(`hero-${viewport.label}.png`, snapshotOptions);
     await expect(page.locator('.profile-surface')).toHaveScreenshot(`profile-${viewport.label}.png`, snapshotOptions);
-    await expect(page.locator('.work-grid')).toHaveScreenshot(`project-grid-${viewport.label}.png`, snapshotOptions);
     await expect(page.locator('.floating-header')).toHaveScreenshot(`nav-collapsed-${viewport.label}.png`, snapshotOptions);
+
+    await gotoVisualState(page, '/work?vr=1');
+    await expect(page.locator('.work-grid')).toHaveScreenshot(`project-grid-${viewport.label}.png`, snapshotOptions);
+
+    await gotoVisualState(page, '/labs/magnetic-blobs?vr=1');
+    await expect(page.locator('.lab-shell').first()).toHaveScreenshot(`lab-magnetic-${viewport.label}.png`, snapshotOptions);
+
+    await gotoVisualState(page, '/labs/animated-list?vr=1');
+    await expect(page.locator('.lab-shell').first()).toHaveScreenshot(`lab-animated-list-${viewport.label}.png`, snapshotOptions);
+
+    await gotoVisualState(page, '/labs/galaxy-field?vr=1');
+    await expect(page.locator('.lab-shell').first()).toHaveScreenshot(`lab-galaxy-${viewport.label}.png`, snapshotOptions);
 
     await gotoVisualState(page, '/?vr=1&state=nav-expanded');
     await expect(page.locator('.floating-header')).toHaveScreenshot(`nav-expanded-${viewport.label}.png`, snapshotOptions);
@@ -63,7 +74,7 @@ for (const viewport of viewports) {
       await expect(page.locator('.floating-header')).toHaveScreenshot(`nav-mobile-hamburger-${viewport.label}.png`, snapshotOptions);
     }
 
-    await gotoVisualState(page, '/?vr=1&state=button-states');
+    await gotoVisualState(page, '/contact?vr=1&state=button-states');
     await expect(page.locator('.button-state-lab')).toHaveScreenshot(`button-states-${viewport.label}.png`, snapshotOptions);
 
     await gotoVisualState(page, '/?vr=1&state=modal');
@@ -72,7 +83,7 @@ for (const viewport of viewports) {
     await gotoVisualState(page, '/?vr=1&state=validation');
     await expect(page.locator('.contact-modal')).toHaveScreenshot(`form-validation-${viewport.label}.png`, snapshotOptions);
 
-    await gotoVisualState(page, '/?vr=1&state=skeleton');
+    await gotoVisualState(page, '/work?vr=1&state=skeleton');
     await expect(page.locator('.work-grid')).toHaveScreenshot(`loading-skeleton-${viewport.label}.png`, snapshotOptions);
   });
 }

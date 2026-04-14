@@ -1,0 +1,48 @@
+.animated-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 64px;
+  height: 64px;
+  pointer-events: none !important;
+  z-index: 9999;
+  mix-blend-mode: screen;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+.cursor-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none !important;
+  filter: drop-shadow(0 0 12px rgba(0, 212, 255, 0.5))
+    drop-shadow(0 0 6px rgba(168, 85, 247, 0.3))
+    drop-shadow(0 0 3px rgba(236, 72, 153, 0.2));
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+@keyframes cursor-brighten {
+  0%, 100% {
+    filter: drop-shadow(0 0 12px rgba(0, 212, 255, 0.5))
+      drop-shadow(0 0 6px rgba(168, 85, 247, 0.3))
+      drop-shadow(0 0 3px rgba(236, 72, 153, 0.2));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(168, 85, 247, 0.6))
+      drop-shadow(0 0 10px rgba(236, 72, 153, 0.4))
+      drop-shadow(0 0 5px rgba(255, 215, 0, 0.2));
+  }
+}
+
+.cursor-image {
+  animation: cursor-brighten 2.2s ease-in-out infinite;
+}
+
+

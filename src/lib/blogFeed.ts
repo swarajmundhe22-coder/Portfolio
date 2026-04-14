@@ -2,6 +2,7 @@ export interface RawBlogPost {
   slug?: string;
   title?: string;
   excerpt?: string;
+  content?: string[] | string;
   featuredImageUrl?: string;
   publishDateIso?: string;
   authorName?: string;
@@ -11,6 +12,7 @@ export interface BlogPostModel {
   slug: string;
   title: string;
   excerpt: string;
+  content: string[];
   featuredImageUrl: string;
   featuredImageSet: string;
   publishDateIso: string;
@@ -49,6 +51,27 @@ const ensureExcerpt = (value: string): string => {
   return `${trimmed.slice(0, 137).trimEnd()}...`;
 };
 
+const ensureContent = (value: string[] | string | undefined, excerpt: string): string[] => {
+  if (Array.isArray(value)) {
+    const normalized = value.map((paragraph) => paragraph.trim()).filter(Boolean);
+    if (normalized.length > 0) {
+      return normalized;
+    }
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const normalized = value
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+    if (normalized.length > 0) {
+      return normalized;
+    }
+  }
+
+  return [ensureExcerpt(excerpt)];
+};
+
 export const normalizeBlogPosts = (rows: RawBlogPost[]): BlogPostModel[] =>
   rows
     .map((row, index) => {
@@ -60,6 +83,7 @@ export const normalizeBlogPosts = (rows: RawBlogPost[]): BlogPostModel[] =>
         slug,
         title,
         excerpt: ensureExcerpt(row.excerpt || ''),
+        content: ensureContent(row.content, row.excerpt || ''),
         featuredImageUrl,
         featuredImageSet: `${featuredImageUrl}?w=480 1x, ${featuredImageUrl}?w=960 2x`,
         publishDateIso: ensureIso(row.publishDateIso || ''),
@@ -86,6 +110,7 @@ export interface RenderedBlogPost {
   slug: string;
   title: string;
   excerpt: string;
+  content: string[];
   featuredImageUrl: string;
   featuredImageSet: string;
   publishDateIso: string;

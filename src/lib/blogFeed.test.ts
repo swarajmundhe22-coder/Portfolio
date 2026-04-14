@@ -33,6 +33,7 @@ describe('blogFeed helpers', () => {
         slug: 'post-a',
         title: 'Post A',
         excerpt: 'This text has enough words for read time math.',
+        content: ['Paragraph 1', 'Paragraph 2'],
         featuredImageUrl: '/project-1.jpg',
         featuredImageSet: '/project-1.jpg 1x, /project-1.jpg 2x',
         publishDateIso: '2026-04-05T08:00:00.000Z',
@@ -42,5 +43,6 @@ describe('blogFeed helpers', () => {
 
     expect(rendered[0].publishDateLabel).toMatch(/2026/);
     expect(rendered[0].readTimeLabel).toMatch(/MIN READ/);
+    expect(rendered[0].content).toHaveLength(2);
   });
 });

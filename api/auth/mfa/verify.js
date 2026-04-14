@@ -60,7 +60,7 @@ export default createSecureHandler(
       return res.status(401).json({
         error: {
           code: 'MFA_INVALID_CODE',
-          message: 'Provided MFA code is invalid.',
+          message: 'The provided MFA code is invalid.',
           requestId,
         },
       });

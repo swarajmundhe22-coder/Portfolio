@@ -247,7 +247,7 @@ const BookingScheduler = ({ className, visualRegressionMode = false }: BookingSc
     }
 
     setFormStatus('submitting');
-    setFeedbackMessage('Submitting booking request...');
+    setFeedbackMessage('Submitting your booking request...');
 
     const summary = buildBookingSummary(selectedDateIso as string, selectedTime as string, timezone);
     const payload = {
@@ -298,7 +298,7 @@ const BookingScheduler = ({ className, visualRegressionMode = false }: BookingSc
       setFeedbackMessage(
         error instanceof Error
           ? error.message
-          : 'Network error. Please retry or use direct email contact.',
+          : 'Network error. Please try again or use direct email contact.',
       );
     }
   };

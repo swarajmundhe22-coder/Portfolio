@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 interface CubeWidgetProps {
   className?: string;
   visualRegressionMode?: boolean;
+  brightnessMode?: string;
 }
 
 const webGlSupported = (): boolean => {
@@ -123,20 +124,46 @@ const CubeWidget = ({ className, visualRegressionMode }: CubeWidgetProps) => {
       stripeTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
       stripeTexture.needsUpdate = true;
 
-      const geometry = new THREE.BoxGeometry(1.48, 1.48, 1.48, 2, 2, 2);
-      const material = new THREE.MeshStandardMaterial({
-        color: '#0f1218',
-        metalness: 0.16,
-        roughness: 0.38,
-        map: stripeTexture,
-        emissive: '#06090f',
-        emissiveIntensity: 0.1,
-      });
+      /* Lines 96-107 omitted */
+      const numCubes = 3;
+      const cubeSize = 0.45;
+      const spacing = 0.05;
+      const offset = ((numCubes - 1) * (cubeSize + spacing)) / 2;
 
-      const cube = new THREE.Mesh(geometry, material);
-      cube.castShadow = true;
-      cube.receiveShadow = false;
-      scene.add(cube);
+      const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+      const edges = new THREE.EdgesGeometry(geometry);
+      
+      const group = new THREE.Group();
+      const blocks: InstanceType<typeof THREE.LineSegments>[] = [];
+
+      for (let x = 0; x < numCubes; x++) {
+        for (let y = 0; y < numCubes; y++) {
+          for (let z = 0; z < numCubes; z++) {
+            const material = new THREE.LineBasicMaterial({
+              color: '#00ffff',
+              linewidth: 2,
+              transparent: true,
+              opacity: 0.5
+            });
+            const block = new THREE.LineSegments(edges, material);
+            block.position.set(
+              x * (cubeSize + spacing) - offset,
+              y * (cubeSize + spacing) - offset,
+              z * (cubeSize + spacing) - offset
+            );
+            // Save logical coordinates for group patterns
+            block.userData = { x, y, z };
+            group.add(block);
+            blocks.push(block);
+          }
+        }
+      }
+
+      scene.add(group);
+      
+      // Store the main object for rotation
+      const mainCube = group;
+      /* Lines 108-115 omitted */
 
       const floorMaterial = new THREE.ShadowMaterial({
         opacity: 0.26,
@@ -188,7 +215,7 @@ const CubeWidget = ({ className, visualRegressionMode }: CubeWidgetProps) => {
 
       setLoadingProgress(70);
 
-      const cycleMs = 12_000;
+      const cycleMs = 6_000; // Increased rotation speed
       const radiansPerMs = (Math.PI * 2) / cycleMs;
       let lastTime = performance.now();
 
@@ -202,11 +229,100 @@ const CubeWidget = ({ className, visualRegressionMode }: CubeWidgetProps) => {
       const renderLoop = (time: number) => {
         const delta = time - lastTime;
         lastTime = time;
+        const timeSec = time * 0.001;
 
-        cube.rotation.x += radiansPerMs * delta;
-        cube.rotation.y += radiansPerMs * delta;
+        // Animation Timeline: 14 second loop
+        const loopDuration = 14.0;
+        const cycleT = timeSec % loopDuration;
+        
+        let progress = 0;
+        if (cycleT < 4.0) {
+          // Phase 1: Assembly (0-4s)
+          const p = cycleT / 4.0;
+          progress = 1 - Math.pow(1 - p, 4); // Quartic ease-out
+        } else if (cycleT < 9.0) {
+          // Phase 2: Formed & Spinning (4-9s, minimum 5 seconds holds fully formed)
+          progress = 1.0;
+        } else {
+          // Phase 3: Disassembly outwards (9-14s)
+          const p = (cycleT - 9.0) / 5.0;
+          progress = 1 - Math.pow(p, 2); // Quadratic ease-in
+        }
 
-        rotationQuaternion.copy(cube.quaternion);
+        // Entire cube spins faster when fully formed
+        const currentSpeed = radiansPerMs * (0.1 + 0.9 * progress);
+        mainCube.rotation.x += currentSpeed * delta;
+        mainCube.rotation.y += currentSpeed * delta;
+
+        const numCubes = 3;
+        const cubeSize = 0.45;
+        const spacing = 0.05;
+        const offset = ((numCubes - 1) * (cubeSize + spacing)) / 2;
+
+        // Dynamic block highlighting & assembly system
+        blocks.forEach((block, index) => {
+          const mat = block.material as InstanceType<typeof THREE.LineBasicMaterial>;
+          const { x, y, z } = block.userData;
+          
+          // Original target grid positions
+          const targetX = x * (cubeSize + spacing) - offset;
+          const targetY = y * (cubeSize + spacing) - offset;
+          const targetZ = z * (cubeSize + spacing) - offset;
+
+          // Exploded scattered positions (multiplied outward with some chaos)
+          const explodeDist = 3.5;
+          const explodeX = targetX * explodeDist + (x - 1) * 2;
+          const explodeY = targetY * explodeDist + Math.sin(index * 0.5) * 2;
+          const explodeZ = targetZ * explodeDist + Math.cos(index * 0.5) * 2;
+
+          // Interpolate spatial position
+          block.position.x = explodeX + (targetX - explodeX) * (1 - progress) + targetX * progress;
+          block.position.y = explodeY + (targetY - explodeY) * (1 - progress) + targetY * progress;
+          block.position.z = explodeZ + (targetZ - explodeZ) * (1 - progress) + targetZ * progress;
+
+          block.position.x = explodeX * (1 - progress) + targetX * progress;
+          block.position.y = explodeY * (1 - progress) + targetY * progress;
+          block.position.z = explodeZ * (1 - progress) + targetZ * progress;
+
+          // Interpolate individual rotation
+          block.rotation.x = (1 - progress) * (x * Math.PI + timeSec * 2);
+          block.rotation.y = (1 - progress) * (y * Math.PI + timeSec * 2);
+          block.rotation.z = (1 - progress) * (z * Math.PI + timeSec * 2);
+
+          // Complex grouped pattern: pulsing wave from center
+          const distToCenter = Math.sqrt(Math.pow(x - 1, 2) + Math.pow(y - 1, 2) + Math.pow(z - 1, 2));
+          const wavePhase = Math.sin(timeSec * 3 - distToCenter * 1.5);
+          
+          // Random spike for individual blocks
+          const randPulse = Math.sin(timeSec * 5 + index * 4);
+
+          // Multi-level highlight states (Only trigger full synthwave when fully assembled)
+          if (progress > 0.95) {
+            if (wavePhase > 0.8 || randPulse > 0.95) {
+              // High-intensity active state (Neon Magenta)
+              mat.color.setHex(0xff007c);
+              mat.opacity = 1.0;
+            } else if (wavePhase > 0.3) {
+              // Medium highlight state (Electric Cyan)
+              mat.color.setHex(0x00f0ff);
+              mat.opacity = 0.7;
+            } else if (distToCenter === 0) {
+              // Core glow (Vibrant Yellow)
+              mat.color.setHex(0xffe600);
+              mat.opacity = 1.0;
+            } else {
+              // Base state (Deep Violet)
+              mat.color.setHex(0x2a0845);
+              mat.opacity = 0.35;
+            }
+          } else {
+            // While forming/exploding, show pure cyan structural lines with expanding opacity
+            mat.color.setHex(0x00f0ff);
+            mat.opacity = 0.1 + (0.7 * progress);
+          }
+        });
+
+        rotationQuaternion.copy(mainCube.quaternion);
 
         keyLight.position
           .copy(baseKeyDirection)
@@ -239,9 +355,12 @@ const CubeWidget = ({ className, visualRegressionMode }: CubeWidgetProps) => {
         window.cancelAnimationFrame(frameId);
 
         geometry.dispose();
+        edges.dispose();
+        blocks.forEach((block) => {
+          (block.material as InstanceType<typeof THREE.LineBasicMaterial>).dispose();
+        });
         floor.geometry.dispose();
         floorMaterial.dispose();
-        material.dispose();
         stripeTexture.dispose();
         renderer.dispose();
 

@@ -1,7 +1,9 @@
-import { memo, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowUpRight, CalendarDays, X } from 'lucide-react';
+import { memo, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { ArrowUpRight, CalendarDays } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { blogPosts } from '../data/portfolioData';
+import CinematicImage from './CinematicImage';
 import { fetchBlogPosts, type RenderedBlogPost } from '../lib/blogFeed';
 
 interface DynamicBlogCardsProps {
@@ -9,15 +11,6 @@ interface DynamicBlogCardsProps {
   skeletonIndexes: number[];
   visualRegressionMode?: boolean;
 }
-
-const parseBlogSlugFromPath = (): string | null => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const match = window.location.pathname.match(/^\/blog\/([a-z0-9-]+)$/i);
-  return match ? decodeURIComponent(match[1]) : null;
-};
 
 const toSlug = (value: string): string =>
   value
@@ -35,6 +28,7 @@ const staticFallbackPosts: RenderedBlogPost[] = blogPosts.map((post, index) => {
     slug: toSlug(post.title),
     title: post.title,
     excerpt: post.excerpt,
+    content: post.content,
     featuredImageUrl: `/project-${imageNumber}.jpg`,
     featuredImageSet: `/project-${imageNumber}.jpg 1x, /project-${imageNumber}.jpg 2x`,
     publishDateIso,
@@ -51,13 +45,7 @@ const DynamicBlogCards = ({
 }: DynamicBlogCardsProps) => {
   const [posts, setPosts] = useState<RenderedBlogPost[]>(staticFallbackPosts);
   const [loading, setLoading] = useState(true);
-  const [activeSlug, setActiveSlug] = useState<string | null>(parseBlogSlugFromPath());
   const [newSlugs, setNewSlugs] = useState<Set<string>>(new Set());
-
-  const activePost = useMemo(
-    () => posts.find((post) => post.slug === activeSlug) ?? null,
-    [activeSlug, posts],
-  );
 
   useEffect(() => {
     if (!contentReady) {
@@ -123,108 +111,56 @@ const DynamicBlogCards = ({
     return () => window.clearTimeout(timeout);
   }, [newSlugs]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const onPopState = () => {
-      setActiveSlug(parseBlogSlugFromPath());
-    };
-
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
-
-  const openPost = (slug: string) => {
-    const search = window.location.search;
-    window.history.pushState({ slug }, '', `/blog/${encodeURIComponent(slug)}${search}`);
-    setActiveSlug(slug);
-  };
-
-  const closePost = () => {
-    const search = window.location.search;
-    window.history.pushState({}, '', `/${search}`);
-    setActiveSlug(null);
-  };
-
   return (
-    <>
-      <div className="blogs-grid">
-        {contentReady && !loading
-          ? posts.map((post, index) => (
-              <motion.article
-                key={post.slug}
-                className={`blog-card ${newSlugs.has(post.slug) ? 'is-new' : ''}`}
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.3 }}
-                transition={{ duration: 0.5, delay: Math.min(index, 5) * 0.07, ease: [0.16, 1, 0.3, 1] }}
+    <div className="blogs-grid">
+      {contentReady && !loading
+        ? posts.map((post, index) => (
+            <motion.article
+              key={post.slug}
+              className={`blog-card ${newSlugs.has(post.slug) ? 'is-new' : ''}`}
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.5, delay: Math.min(index, 5) * 0.07, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Link
+                className="blog-card-link"
+                aria-label={`Open full article: ${post.title}`}
+                to={`/blogs/${encodeURIComponent(post.slug)}`}
               >
-                <button
-                  type="button"
-                  className="blog-card-link"
-                  aria-haspopup="dialog"
-                  aria-expanded={activeSlug === post.slug}
-                  onClick={() => openPost(post.slug)}
-                >
-                  <img
-                    src={post.featuredImageUrl}
-                    srcSet={post.featuredImageSet}
-                    loading="lazy"
-                    alt=""
-                    className="blog-card-media"
-                  />
-                  <header>
-                    <p>
-                      <CalendarDays size={14} /> {post.publishDateLabel} - {post.readTimeLabel}
-                    </p>
-                    <ArrowUpRight size={16} />
-                  </header>
-                  <h3>{post.title}</h3>
-                  <p>{post.excerpt}</p>
-                  <div className="tag-row">
-                    <span>{post.authorName}</span>
-                    <span>{post.readTimeLabel}</span>
-                  </div>
-                </button>
-              </motion.article>
-            ))
-          : skeletonIndexes.map((index) => (
-              <article key={`blog-skeleton-${index}`} className="blog-card skeleton-card" aria-hidden="true">
-                <div className="skeleton-line short" />
-                <div className="skeleton-line title" />
-                <div className="skeleton-line" />
-                <div className="skeleton-line" />
-              </article>
-            ))}
-      </div>
-
-      <AnimatePresence>
-        {activePost ? (
-          <motion.aside
-            className="blog-route-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label={activePost.title}
-            initial={{ opacity: 0, x: 28 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 28 }}
-            transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <button type="button" className="blog-route-close" onClick={closePost}>
-              <X size={16} />
-              Close
-            </button>
-            <p className="blog-route-meta">
-              {activePost.publishDateLabel} - {activePost.readTimeLabel} - {activePost.authorName}
-            </p>
-            <h4>{activePost.title}</h4>
-            <p>{activePost.excerpt}</p>
-          </motion.aside>
-        ) : null}
-      </AnimatePresence>
-    </>
+                <CinematicImage
+                  className="blog-card-media"
+                  src={post.featuredImageUrl}
+                  srcSet={post.featuredImageSet}
+                  loading={index === 0 ? 'eager' : 'lazy'}
+                  fetchPriority={index === 0 ? 'high' : 'auto'}
+                  decoding="async"
+                  alt=""
+                />
+                <header>
+                  <p>
+                    <CalendarDays size={14} /> {post.publishDateLabel} - {post.readTimeLabel}
+                  </p>
+                  <ArrowUpRight size={16} />
+                </header>
+                <h3>{post.title}</h3>
+                <p>{post.excerpt}</p>
+                <div className="tag-row">
+                  <span>{post.authorName}</span>
+                  <span>{post.readTimeLabel}</span>
+                </div>
+              </Link>
+            </motion.article>
+          ))
+        : skeletonIndexes.map((index) => (
+            <article key={`blog-skeleton-${index}`} className="blog-card skeleton-card" aria-hidden="true">
+              <div className="skeleton-line short" />
+              <div className="skeleton-line title" />
+              <div className="skeleton-line" />
+              <div className="skeleton-line" />
+            </article>
+          ))}
+    </div>
   );
 };
 

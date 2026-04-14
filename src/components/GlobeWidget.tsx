@@ -37,11 +37,11 @@ const WIDTH = 560;
 const HEIGHT = 560;
 
 const REGION_POINTS: RegionPoint[] = [
-  { code: 'GBR', label: 'UK', coordinates: [-3.4, 55.3] },
-  { code: 'IND', label: 'India', coordinates: [78.9, 22.4] },
-  { code: 'USA', label: 'USA', coordinates: [-98.5, 39.8] },
-  { code: 'JPN', label: 'Japan', coordinates: [138.2, 36.2] },
-  { code: 'FRA', label: 'France', coordinates: [2.6, 46.7] },
+  { code: 'GBR', label: 'United Kingdom', coordinates: [-2.0, 54.0] },
+  { code: 'IND', label: 'India', coordinates: [78.0, 20.0] },
+  { code: 'USA', label: 'United States', coordinates: [-95.0, 38.0] },
+  { code: 'JPN', label: 'Japan', coordinates: [138.0, 36.0] },
+  { code: 'FRA', label: 'France', coordinates: [2.2, 46.0] },
 ];
 
 const BASE_FEED: Record<RegionCode, { name: string; value: number }> = {
@@ -100,8 +100,10 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
   const [displayValues, setDisplayValues] = useState<Record<RegionCode, number>>(() => ({ ...BASE_VALUES }));
   const [rotation, setRotation] = useState(-16);
   const [selectedCode, setSelectedCode] = useState<RegionCode>('IND');
-  const [tooltipCode, setTooltipCode] = useState<RegionCode | null>(null);
+  const [hoveredCode, setHoveredCode] = useState<RegionCode | null>(null);
+  const [, setTooltipCode] = useState<RegionCode | null>(null);
   const [zoomed, setZoomed] = useState(false);
+  const [targetRotation, setTargetRotation] = useState(-16);
   const displayRef = useRef(displayValues);
 
   useEffect(() => {
@@ -184,13 +186,19 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
     const tick = (time: number) => {
       const delta = time - last;
       last = time;
-      setRotation((current) => current + (360 * delta) / 12_000);
+      setRotation((current) => {
+        const diff = targetRotation - current;
+        if (Math.abs(diff) < 0.1) {
+          return targetRotation;
+        }
+        return current + diff * 0.08;
+      });
       frameId = window.requestAnimationFrame(tick);
     };
 
     frameId = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frameId);
-  }, [visualRegressionMode]);
+  }, [visualRegressionMode, targetRotation]);
 
   const projection = useMemo(
     () =>
@@ -202,7 +210,18 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
     [rotation, zoomed],
   );
 
-  const pathBuilder = useMemo(() => geoPath(projection), [projection]);
+  const calculateLabelPosition = (point: RegionProjectionSnapshot) => {
+    const offsetDistance = 35;
+    const angle = Math.atan2(point.y - HEIGHT / 2, point.x - WIDTH / 2);
+    const offsetX = Math.cos(angle) * offsetDistance;
+    const offsetY = Math.sin(angle) * offsetDistance;
+    
+    return {
+      x: point.x + offsetX,
+      y: point.y + offsetY,
+      angle: angle * (180 / Math.PI),
+    };
+  };
 
   const centerCoords = projection.invert
     ? (projection.invert([WIDTH / 2, HEIGHT / 2]) as [number, number] | null)
@@ -252,6 +271,8 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
     [projectionSnapshots],
   );
 
+  const pathBuilder = useMemo(() => geoPath(projection), [projection]);
+
   const graticulePath = useMemo(() => pathBuilder(geoGraticule10()) || '', [pathBuilder]);
 
   const arcs = useMemo(() => {
@@ -280,12 +301,10 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
       .filter((item): item is { id: string; d: string } => item !== null);
   }, [projection, selectedCode]);
 
-  const effectiveMetrics = visualRegressionMode ? BASE_FEED : metrics;
-  const effectiveValues = visualRegressionMode ? BASE_VALUES : displayValues;
 
-  const selectedMetric = effectiveMetrics[selectedCode];
-  const selectedDisplayValue = Math.round(effectiveValues[selectedCode]);
-  const tooltipMetric = tooltipCode ? effectiveMetrics[tooltipCode] : null;
+  const effectiveValues = visualRegressionMode ? BASE_VALUES : displayValues;   
+
+  const selectedDisplayValue = Math.round(effectiveValues[selectedCode]);       
 
   return (
     <div className={`globe-widget ${className || ''}`.trim()}>
@@ -297,68 +316,150 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
           aria-label="Interactive globe feed"
         >
         <defs>
-          <radialGradient id="globeGlow" cx="50%" cy="45%" r="60%">
-            <stop offset="0%" stopColor="#2a4f96" stopOpacity="0.26" />
-            <stop offset="100%" stopColor="#090c14" stopOpacity="0" />
+          {/* Realistic spherical gradient with topographic shading */}
+          <radialGradient id="globeSphere" cx="40%" cy="35%" r="75%">
+            <stop offset="0%" stopColor="#3d6b99" stopOpacity="1" />
+            <stop offset="20%" stopColor="#2d5a88" stopOpacity="1" />
+            <stop offset="50%" stopColor="#1d4a78" stopOpacity="1" />
+            <stop offset="75%" stopColor="#0d2a48" stopOpacity="1" />
+            <stop offset="100%" stopColor="#051020" stopOpacity="1" />
           </radialGradient>
+          <radialGradient id="globeGlow" cx="50%" cy="40%" r="65%">
+            <stop offset="0%" stopColor="#1e3a5f" stopOpacity="0.8" />
+            <stop offset="60%" stopColor="#0a1428" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+          </radialGradient>
+          <filter id="realisticGlow">
+            <feGaussianBlur stdDeviation="1.5" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="dotGlow">
+            <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.6" floodColor="#64b5f6" />
+          </filter>
+          <filter id="labelRealisticGlow">
+            <feGaussianBlur stdDeviation="1" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
 
         <circle
           cx={WIDTH / 2}
           cy={HEIGHT / 2}
           r={WIDTH * 0.43}
-          fill="#070a11"
-          stroke="#e4e9ff"
-          strokeOpacity={0.25}
-          strokeWidth={2}
+          fill="url(#globeSphere)"
+          stroke="#5a8ec4"
+          strokeOpacity={0.35}
+          strokeWidth={1.2}
+          filter="url(#realisticGlow)"
         />
 
-        <circle cx={WIDTH / 2} cy={HEIGHT / 2} r={WIDTH * 0.46} fill="url(#globeGlow)" aria-hidden="true" />
+        <circle cx={WIDTH / 2} cy={HEIGHT / 2} r={WIDTH * 0.48} fill="url(#globeGlow)" aria-hidden="true" />
 
-        <path d={graticulePath} fill="none" stroke="#1f2f4f" strokeOpacity={0.45} strokeWidth={1} />
+        <path d={graticulePath} fill="none" stroke="#3a5a8a" strokeOpacity={0.25} strokeWidth={0.6} />
 
         {arcs.map((arc) => (
           <g key={arc.id}>
-            <path d={arc.d} className="globe-route-glow" />
-            <path d={arc.d} className="globe-route-core" />
+            <path d={arc.d} className="globe-route-professional" />
           </g>
         ))}
 
         {visiblePoints.map((point) => {
           const value = Math.round(effectiveValues[point.code]);
           const isActive = selectedCode === point.code;
+          const labelPos = calculateLabelPosition(point);
 
           return (
             <g key={point.code}>
+              {/* Professional data point dot */}
               <circle
                 cx={point.x}
                 cy={point.y}
-                r={isActive ? 8 : 6}
-                fill={metricColor(value)}
-                stroke="#dbe6ff"
+                r={isActive ? 5.5 : 4}
+                fill="#5a9ddf"
+                stroke="#e8f4ff"
                 strokeOpacity={0.9}
                 strokeWidth={1.2}
+                filter="url(#dotGlow)"
+                style={{
+                  cursor: 'pointer',
+                  transition: 'all 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
                 onPointerEnter={() => setTooltipCode(point.code)}
                 onPointerLeave={() => setTooltipCode(null)}
                 onClick={() => {
                   setSelectedCode(point.code);
                   setZoomed(true);
+                  setTargetRotation(-point.coordinates[0]);
                 }}
               />
-              <text
-                x={point.x + 10}
-                y={point.y - 8}
-                fill="#f4f7ff"
-                fontSize={12}
-                fontWeight={600}
-                pointerEvents="none"
-                stroke="rgba(255,255,255,0.78)"
-                strokeWidth={2.4}
-                paintOrder="stroke"
-                data-render-order={point.renderOrder}
-              >
-                {point.label}
-              </text>
+              {/* Subtle outer ring for active state */}
+              {isActive && (
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r={7.5}
+                  fill="none"
+                  stroke="#5a9ddf"
+                  strokeOpacity={0.25}
+                  strokeWidth={1}
+                  style={{
+                    animation: 'pulse-subtle 2s ease-in-out infinite',
+                  }}
+                />
+              )}
+              {/* Connection line from dot to label */}
+              {isActive && (
+                <line
+                  x1={point.x}
+                  y1={point.y}
+                  x2={labelPos.x}
+                  y2={labelPos.y}
+                  stroke="#5a9ddf"
+                  strokeWidth={0.7}
+                  strokeOpacity={0.3}
+                  strokeDasharray="2,3"
+                />
+              )}
+              {/* Professional label box with smart positioning */}
+              <g className="globe-label-group" style={{ pointerEvents: 'none' }}>
+                <rect
+                  x={labelPos.x - 50}
+                  y={labelPos.y - 14}
+                  width={100}
+                  height={22}
+                  rx={4}
+                  fill="rgba(10, 20, 40, 0.92)"
+                  stroke={isActive ? '#5a9ddf' : '#3a5a8a'}
+                  strokeWidth={isActive ? 1.2 : 0.8}
+                  strokeOpacity={isActive ? 0.8 : 0.5}
+                  filter="url(#labelRealisticGlow)"
+                  style={{
+                    transition: 'all 250ms ease-out',
+                  }}
+                />
+                <text
+                  x={labelPos.x}
+                  y={labelPos.y + 2}
+                  fill={isActive ? '#a8d4ff' : '#8ab8e6'}
+                  fontSize="12"
+                  fontWeight={isActive ? '700' : '600'}
+                  textAnchor="middle"
+                  pointerEvents="none"
+                  style={{
+                    transition: 'fill 250ms ease, font-weight 250ms ease',
+                    fontFamily: "'Segoe UI', 'Helvetica Neue', sans-serif",
+                    letterSpacing: '0.4px',
+                  }}
+                >
+                  {point.label}
+                </text>
+              </g>
             </g>
           );
         })}
@@ -391,23 +492,18 @@ const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
             type="button"
             role="tab"
             aria-selected={selectedCode === point.code}
-            className={selectedCode === point.code ? 'is-active' : ''}
+            className={`globe-pill ${selectedCode === point.code ? 'is-active' : ''} ${hoveredCode === point.code ? 'is-hovered' : ''}`}
+            onMouseEnter={() => setHoveredCode(point.code)}
+            onMouseLeave={() => setHoveredCode(null)}
             onClick={() => {
               setSelectedCode(point.code);
               setZoomed(true);
+              setTargetRotation(-point.coordinates[0]);
             }}
           >
             {point.code === 'GBR' ? 'GB UK' : point.code === 'IND' ? 'IN India' : point.code === 'USA' ? 'US USA' : point.label}
           </button>
         ))}
-      </div>
-
-      <div className="globe-remote-readout" aria-live="polite">
-        <div className="globe-remote-head">
-          <span className="globe-remote-pin" aria-hidden="true" />
-          <span>LIVE FEED</span>
-        </div>
-        <strong>{selectedDisplayValue.toLocaleString()}</strong>
       </div>
     </aside>
     </div>
