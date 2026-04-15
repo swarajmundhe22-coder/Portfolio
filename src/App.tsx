@@ -42,6 +42,8 @@ import MagneticBlobsLab from './labs/magnetic/MagneticBlobsLab';
 import AnimatedListLab from './labs/animated-list/AnimatedListLab';
 import GalaxyFieldLab from './labs/galaxy/GalaxyFieldLab';
 import './App.css';
+import './work-cards-premium.css';
+import './voices-cards-premium.css';
 import './labs/labs.css';
 
 const loadCubeWidget = () => import('./components/CubeWidget.tsx');
@@ -611,18 +613,379 @@ const HomePage = ({
         whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ ...cardRevealTransition, delay: 0.18 }}
+        style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden', position: 'relative' }}
       >
-        <header className="globe-header">
-          <p className="caps">Available globally</p>
-          <h3>
-            Adaptable across
+        <style>{`
+          @keyframes subtle-glow {
+            0%, 100% { 
+              box-shadow: 0 10px 30px rgba(91, 159, 216, 0.1),
+                          0 0 1px rgba(91, 159, 216, 0.2);
+            }
+            50% { 
+              box-shadow: 0 15px 40px rgba(91, 159, 216, 0.15),
+                          0 0 1px rgba(91, 159, 216, 0.3);
+            }
+          }
+          @keyframes number-pop {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+          @keyframes accent-pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+          }
+          /* Clean stat card */
+          .enterprise-stat-card {
+            position: relative;
+            padding: 2rem 1.8rem;
+            border-radius: 1rem;
+            background: linear-gradient(145deg, rgba(12, 16, 28, 0.7) 0%, rgba(8, 12, 20, 0.9) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            cursor: pointer;
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: transform, border-color, box-shadow;
+            transform: translateZ(0);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+          }
+          
+          .enterprise-stat-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            border-color: rgba(255, 255, 255, 0.15);
+            background: linear-gradient(145deg, rgba(20, 26, 42, 0.8) 0%, rgba(12, 16, 28, 0.95) 100%);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(91, 159, 216, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+          }
+          
+          .stat-card-corner {
+            display: none;
+          }
+          
+          .stat-number {
+            font-family: 'Clash Display', sans-serif;
+            font-size: clamp(3.5rem, 6vw, 4.5rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, #ffffff 0%, #38bdf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.8rem;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            animation: number-pop 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+            font-variant-numeric: tabular-nums;
+            color: #e0f2fe; /* fallback */
+            filter: drop-shadow(0 0 15px rgba(56, 189, 248, 0.5));
+          }
+          
+          .stat-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 0.85rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            position: relative;
+            z-index: 1;
+            line-height: 1.4;
+          }
+          
+          .stat-desc {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            color: #a5cddd;
+            line-height: 1.6;
+          }
+            line-height: 1.5;
+            position: relative;
+            z-index: 1;
+            font-weight: 400;
+            letter-spacing: 0.01em;
+          }
+          
+          /* Cinematic expertise section */
+          .expertise-section {
+            margin-top: 3rem;
+            padding-top: 2.5rem;
+            border-top: 1px solid rgba(91, 159, 216, 0.2);
+            position: relative;
+          }
+          .expertise-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.8rem;
+          }
+          .expertise-category {
+            position: relative;
+            padding: 3rem 2.5rem;
+            border-radius: 0.75rem;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(91, 159, 216, 0.15);
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            will-change: transform, border-color;
+            transform: translateZ(0);
+          }
+          .expertise-category::before {
+            display: none;
+          }
+          .expertise-category::after {
+            display: none;
+          }
+          .expertise-category:hover::before {
+            display: none;
+          }
+          .expertise-category:hover {
+            transform: translateY(-10px);
+            border-color: rgba(91, 159, 216, 0.3);
+            background: rgba(15, 23, 42, 0.6);
+          }
+          .expertise-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: linear-gradient(90deg, #5b9fd8 0%, #7cb8ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 2.2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            position: relative;
+            z-index: 2;
+          }
+          .expertise-title::before {
+            content: '';
+            width: 3px;
+            height: 18px;
+            background: linear-gradient(180deg, #5b9fd8 0%, #7cb8ff 100%);
+            border-radius: 2px;
+            flex-shrink: 0;
+            animation: accent-pulse 3s ease-in-out infinite;
+          }
+          .expertise-item {
+            font-size: 0.95rem;
+            color: #a5c9e8;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 2;
+            font-weight: 500;
+            cursor: pointer;
+            margin-bottom: 0;
+            padding: 0;
+            border-radius: 0;
+            background: none;
+            border: none;
+          }
+          .expertise-item:hover {
+            color: #e0e7ff;
+            transform: translateX(6px);
+            background: none;
+            box-shadow: none;
+            padding-left: 0;
+          }
+          .expertise-item::before {
+            content: '→';
+            color: #5b9fd8;
+            font-weight: bold;
+            flex-shrink: 0;
+            font-size: 1rem;
+            animation: none;
+            filter: none;
+          }
+          .expertise-text {
+            line-height: 1.5;
+            letter-spacing: 0.01em;
+          }
+          
+          /* Responsive mobile adjustments */
+          @media (max-width: 768px) {
+            .enterprise-stat-card {
+              padding: 2.5rem 2rem;
+            }
+            .stat-number {
+              font-size: 2.5rem;
+            }
+            .stat-label {
+              font-size: 0.9rem;
+            }
+            .stat-desc {
+              font-size: 0.75rem;
+            }
+            .expertise-category {
+              padding: 2.5rem 2rem;
+            }
+            .expertise-title {
+              font-size: 0.95rem;
+            }
+            .expertise-item {
+              font-size: 0.9rem;
+            }
+            .expertise-grid {
+              grid-template-columns: 1fr;
+              gap: 1.2rem;
+            }
+          }
+        `}</style>
+
+        <motion.header 
+          className="globe-header" 
+          style={{ marginBottom: '5rem', position: 'relative', zIndex: 2 }}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.5 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+        >
+          <p className="caps" style={{ marginBottom: '1.5rem', fontSize: '0.85rem', letterSpacing: '0.3em', textTransform: 'uppercase', opacity: 0.8, fontFamily: "'Inter', sans-serif" }}>Open Source Advocate</p>
+          <h3 style={{ 
+            lineHeight: 1.1, 
+            fontSize: 'clamp(2.5rem, 5vw, 4.2rem)',
+            letterSpacing: '-0.02em',
+            marginBottom: '2rem',
+            fontWeight: 600,
+            maxWidth: '100%',
+            fontFamily: "'Clash Display', sans-serif",
+            textShadow: '0 4px 30px rgba(255,255,255,0.1)'
+          }}>
+            <motion.span
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2, duration: 0.6 }}
+              style={{ display: 'inline', marginRight: '0.25em' }}
+            >
+              Architecting
+            </motion.span>
+            <motion.span
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              style={{ display: 'inline', marginRight: '0.25em' }}
+            >
+              Code
+            </motion.span>
             <br />
-            time zones
+            <motion.span
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              style={{ display: 'inline', marginRight: '0.25em' }}
+            >
+              for the Global
+            </motion.span>
+            
+            <motion.span
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+              style={{ display: 'inline', background: 'linear-gradient(90deg, #5b9fd8 0%, #7cb8ff 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
+            >
+              Ecosystem
+            </motion.span>
           </h3>
-        </header>
-        <Suspense fallback={<WidgetFallback className="widget-loading-placeholder-globe" />}>
-          <GlobeWidget visualRegressionMode={runtimeFlags.visualRegressionMode} />
-        </Suspense>
+        </motion.header>
+
+        <motion.div 
+          style={{ 
+            flex: 1, 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+            gap: '1.5rem', 
+            alignItems: 'stretch', 
+            position: 'relative', 
+            zIndex: 2 ,
+            marginBottom: '4rem'
+          }}
+        >
+          {[
+            { number: '150+', label: 'Pull Requests', desc: 'Architecting features and squashing bugs across core repositories.' },
+            { number: '20+', label: 'Active Libraries', desc: 'Building zero-dependency, open-source tools developers truly love.' },
+            { number: '10k+', label: 'Commits', desc: 'Relentlessly pushing the boundaries of modern web development.' }
+          ].map((stat, idx) => (
+            <motion.div 
+              key={idx}
+              className="enterprise-stat-card"
+              initial={{ opacity: 0, y: 25 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.5 }}
+              transition={{ 
+                delay: idx * 0.15, 
+                duration: 0.6,
+                ease: [0.34, 1.56, 0.64, 1]
+              }}
+              whileHover={{ 
+                scale: 1.02,
+                transition: { duration: 0.3, ease: "easeOut" }
+              }}
+            >
+              <div className="stat-card-corner top-left" />
+              <div className="stat-number">{stat.number}</div>
+              <div className="stat-label">{stat.label}</div>
+              <div className="stat-desc">{stat.desc}</div>
+              <div className="stat-card-corner bottom-right" />
+            </motion.div>
+          ))}
+        </motion.div>
+
+        <motion.div 
+          className="expertise-section"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ delay: 0.4, duration: 0.8 }}
+        >
+          <div className="expertise-grid">
+            {[
+              { 
+                title: 'Technical Excellence', 
+                items: ['Full-stack Architecture', 'Performance at Scale', 'Distributed Systems', 'Enterprise Security']
+              },
+              { 
+                title: 'Specializations', 
+                items: ['SaaS Platforms', 'Real-time Systems', 'Cloud Infrastructure', 'DevOps & Automation']
+              }
+            ].map((section, idx) => (
+              <motion.div 
+                key={idx}
+                className="expertise-category"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ 
+                  delay: 0.5 + (idx * 0.15),
+                  duration: 0.7,
+                  ease: [0.34, 1.56, 0.64, 1]
+                }}
+              >
+                <div className="expertise-title">{section.title}</div>
+                <motion.div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                  {section.items.map((item, i) => (
+                    <motion.div 
+                      key={i} 
+                      className="expertise-item"
+                      initial={{ opacity: 0, x: -10 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true, amount: 0.5 }}
+                      transition={{ delay: 0.6 + (idx * 0.15) + (i * 0.08), duration: 0.5 }}
+                    >
+                      <span className="expertise-text">{item}</span>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
       </motion.article>
 
       <motion.article
@@ -635,36 +998,6 @@ const HomePage = ({
         <Suspense fallback={<WidgetFallback className="widget-loading-placeholder-clock" />}>
           <TimezoneClockWidget visualRegressionMode={runtimeFlags.visualRegressionMode} />
         </Suspense>
-      </motion.article>
-
-      <motion.article
-        className="surface-card founder-surface"
-        initial={{ opacity: 0, y: 26, filter: 'blur(8px)' }}
-        whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-        viewport={{ once: true, amount: 0.3 }}
-        transition={{ ...cardRevealTransition, delay: 0.28 }}
-      >
-        <p className="founder-copy" style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 700, letterSpacing: '0.02em' }}>
-          Founder of <span className="founder-name" style={{ color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>ARVYA</span>
-        </p>
-        <p className="sub-script">Designing and shipping measurable web products</p>
-        <div className="phone-strip">
-          <div className="phone-mock group">
-            <div className="phone-overlay">
-              <span className="overlay-text interactive-font" style={{ fontFamily: "monospace, monospace", fontWeight: "bold", fontSize: "1.1rem", textTransform: 'uppercase' }}>Deploying Soon !</span>
-            </div>
-          </div>
-          <div className="phone-mock tilt group">
-            <div className="phone-overlay">
-              <span className="overlay-text interactive-font" style={{ fontFamily: "monospace, monospace", fontWeight: "bold", fontSize: "1.1rem", textTransform: 'uppercase' }}>Deploying Soon !</span>
-            </div>
-          </div>
-          <div className="phone-mock tilt-neg group">
-            <div className="phone-overlay">
-              <span className="overlay-text interactive-font" style={{ fontFamily: "monospace, monospace", fontWeight: "bold", fontSize: "1.1rem", textTransform: 'uppercase' }}>Deploying Soon !</span>
-            </div>
-          </div>
-        </div>
       </motion.article>
     </section>
   </>
@@ -787,15 +1120,35 @@ const AboutPage = ({ contributionTotal, heatMapLevels }: Omit<AboutPageProps, 'r
   </>
 );
 
-const WorkPage = ({ runtimeFlags, contentReady, skeletonCards }: WorkPageProps) => (
-  <>
-    <SectionTitle
-      sectionId="work-intro"
-      navSection="work"
-      eyebrow="Crafting digital experiences"
-      title="MY WORK"
-      script="through systems &amp; code."
-    />
+const WorkPage = ({ runtimeFlags, contentReady, skeletonCards }: WorkPageProps) => {
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const topRowReviews = useMemo(
+    () => openSourceReviews.filter((_, reviewIndex) => reviewIndex % 2 === 0),
+    []
+  );
+  const bottomRowReviews = useMemo(
+    () => openSourceReviews.filter((_, reviewIndex) => reviewIndex % 2 === 1),
+    []
+  );
+  const voiceLanes = useMemo(
+    () => [
+      { laneId: 'top', reviews: topRowReviews },
+      { laneId: 'bottom', reviews: bottomRowReviews },
+    ],
+    [topRowReviews, bottomRowReviews]
+  );
+  const getVoiceReviewGroups = (reviews: typeof openSourceReviews) =>
+    runtimeFlags.visualRegressionMode ? [reviews] : [reviews, reviews];
+
+  return (
+    <>
+      <SectionTitle
+        sectionId="work-intro"
+        navSection="work"
+        eyebrow="Crafting digital experiences"
+        title="MY WORK"
+        script="through systems &amp; code."
+      />
 
     <section
       id="work"
@@ -806,56 +1159,152 @@ const WorkPage = ({ runtimeFlags, contentReady, skeletonCards }: WorkPageProps) 
     >
       <div className={`work-grid ${contentReady && workItems.length === 1 ? 'is-single' : ''}`.trim()}>
         {contentReady
-          ? workItems.map((item, index) => (
+          ? workItems.map((item, index) => {
+              const isExpanded = expandedCard === item.title;
+              return (
               <motion.article
                 key={item.title}
-                className={`work-card ${workItems.length === 1 ? 'is-founder-focus' : ''}`.trim()}
+                className={`work-card work-accent-${item.accent} ${workItems.length === 1 ? 'is-founder-focus' : ''} ${isExpanded ? 'is-expanded' : ''}`.trim()}
                 initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
                 transition={{ duration: 0.72, delay: index * 0.06, ease: cinematicEase }}
+                layout
               >
-                <p>{item.category}</p>
-                <h3>{item.title}</h3>
-                {item.imageSrc ? (
-                  <figure className="work-visual">
-                    <CinematicImage
-                      className="work-visual-image"
-                      src={item.imageSrc}
-                      alt={item.imageAlt ?? `${item.title} preview image`}
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                      fetchPriority={index === 0 ? 'high' : 'auto'}
-                      decoding="async"
-                    />
-                  </figure>
-                ) : null}
-                <p className="desc">{item.description}</p>
-                <div className="work-meta">
-                  <div className="work-stack">
-                    {item.stack.map((skill) => (
-                      <span key={`${item.title}-${skill}`}>{skill}</span>
-                    ))}
-                  </div>
-                  <p className="work-outcome">{item.outcome}</p>
-                  {item.context ? (
-                    <div className="work-context-block">
-                      {item.context
-                        .split(/\n\s*\n/)
-                        .map((paragraph) => paragraph.trim())
-                        .filter(Boolean)
-                        .map((paragraph, paragraphIndex) => (
-                          <p key={`${item.title}-context-${paragraphIndex}`} className="work-context">
-                            {paragraph}
-                          </p>
-                        ))}
-                    </div>
-                  ) : null}
+                {/* Premium Gradient Overlay */}
+                <div className="work-card-overlay" aria-hidden="true" />
+
+                {/* Visual Badge */}
+                <div className="work-badge">
+                  <span className="work-badge-accent">{item.accent.toUpperCase()}</span>
                 </div>
-                <a href={item.href} target="_blank" rel="noreferrer">
-                  View repository <ArrowUpRight size={16} />
-                </a>
+
+                <button
+                  className="work-card-header-button"
+                  onClick={() => setExpandedCard(isExpanded ? null : item.title)}
+                  aria-expanded={isExpanded}
+                  aria-controls={`work-details-${item.title}`}
+                >
+                  <header className="work-header">
+                    <div className="work-header-top">
+                      <span className="work-category">{item.category}</span>
+                      <span className="work-accent-dot" aria-hidden="true"></span>
+                    </div>
+                    <h3 className="work-title">{item.title}</h3>
+                    <p className="work-brief">{item.description}</p>
+                  </header>
+
+                  <motion.div
+                    className="work-expand-icon"
+                    animate={{ rotate: isExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                      <path d="M6 8l4 4 4-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </motion.div>
+                </button>
+
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      id={`work-details-${item.title}`}
+                      className="work-details-panel"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.4, ease: cinematicEase }}
+                    >
+                      {item.imageSrc ? (
+                        <motion.figure
+                          className="work-visual-premium"
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.5, delay: 0.1 }}
+                        >
+                          <CinematicImage
+                            className="work-visual-image"
+                            src={item.imageSrc}
+                            alt={item.imageAlt ?? `${item.title} preview image`}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                          <div className="work-visual-overlay" aria-hidden="true" />
+                        </motion.figure>
+                      ) : null}
+
+                      <div className="work-meta-premium">
+                        <motion.section
+                          className="work-outcome-section-premium"
+                          initial={{ opacity: 0, x: -12 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.5, delay: 0.15 }}
+                        >
+                          <h4 className="work-section-label">Business Impact</h4>
+                          <div className="work-outcome-card">
+                            <p className="work-outcome">{item.outcome}</p>
+                            <div className="work-outcome-indicator" />
+                          </div>
+                        </motion.section>
+
+                        <motion.section
+                          className="work-stack-section-premium"
+                          initial={{ opacity: 0, x: -12 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.5, delay: 0.2 }}
+                        >
+                          <h4 className="work-section-label">Technology Stack</h4>
+                          <div className="work-stack-premium">
+                            {item.stack.map((skill, stackIndex) => (
+                              <motion.span
+                                key={`${item.title}-${skill}`}
+                                className="work-stack-chip-premium"
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.2 + stackIndex * 0.05 }}
+                                whileHover={{ scale: 1.08, y: -2 }}
+                              >
+                                {skill}
+                              </motion.span>
+                            ))}
+                          </div>
+                        </motion.section>
+
+                        {item.context ? (
+                          <motion.section
+                            className="work-context-section-premium"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.5, delay: 0.25 }}
+                          >
+                            <h4 className="work-section-label">Technical Deep Dive</h4>
+                            <div className="work-context-block-premium">
+                              {item.context
+                                .split(/\n\s*\n/)
+                                .map((paragraph) => paragraph.trim())
+                                .filter(Boolean)
+                                .slice(0, 2)
+                                .map((paragraph, paragraphIndex) => (
+                                  <motion.p
+                                    key={`${item.title}-context-${paragraphIndex}`}
+                                    className="work-context-paragraph-premium"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ duration: 0.5, delay: 0.3 + paragraphIndex * 0.1 }}
+                                  >
+                                    {paragraph}
+                                  </motion.p>
+                                ))}
+                            </div>
+                          </motion.section>
+                        ) : null}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.article>
-            ))
+            );
+            })
           : skeletonCards.map((index) => (
               <article key={`work-skeleton-${index}`} className="work-card skeleton-card" aria-hidden="true">
                 <div className="skeleton-line short" />
@@ -866,14 +1315,6 @@ const WorkPage = ({ runtimeFlags, contentReady, skeletonCards }: WorkPageProps) 
               </article>
             ))}
       </div>
-
-      <article className="logic-band">
-        <p className="caps">Behind the curtains</p>
-        <h3>
-          Decoding logic
-          <span>&amp; release confidence</span>
-        </h3>
-      </article>
     </section>
 
     <section
@@ -882,42 +1323,150 @@ const WorkPage = ({ runtimeFlags, contentReady, skeletonCards }: WorkPageProps) 
       data-color-theme="work"
       data-cinematic-hook="social-proof"
     >
-      <p className="caps">Community reviews</p>
-      <h3>
-        The Voices <span>Behind</span>
-      </h3>
-      <div className={`voices-float-stage ${runtimeFlags.visualRegressionMode ? 'is-static' : ''}`.trim()}>
-        {openSourceReviews.map((item, index) => (
-          <motion.article
-            key={item.id}
-            className={`voice-float-card lane-${(index % 8) + 1} drift-${(index % 4) + 1} ${runtimeFlags.visualRegressionMode ? 'is-static' : ''}`.trim()}
-            initial={{ opacity: 0, y: 20, scale: 0.98 }}
-            whileInView={{ opacity: 1, y: 0, scale: 1 }}
-            viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: 0.55, delay: index * 0.05, ease: cinematicEase }}
-          >
-            <header className="voice-float-head">
-              <img src={item.avatarUrl} alt={`${item.userName} profile picture`} loading="lazy" decoding="async" />
-              <div className="voice-float-user">
-                <h4>{item.userName}</h4>
-                <p>{item.handle}</p>
+      <motion.div
+        className="voices-headline"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.1 }}
+        transition={{ duration: 0.6, ease: cinematicEase }}
+      >
+        <p className="caps">Community reviews</p>
+        <h3>
+          The Voices <motion.span
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, amount: 0.1 }}
+            transition={{ duration: 0.7, delay: 0.2, ease: cinematicEase }}
+          >Behind</motion.span>
+        </h3>
+      </motion.div>
+
+      <motion.div 
+        className={`voices-float-stage ${runtimeFlags.visualRegressionMode ? 'is-static' : ''}`.trim()}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.1 }}
+        variants={{
+          hidden: { opacity: 0 },
+          visible: {
+            opacity: 1,
+            transition: {
+              staggerChildren: 0.08,
+              delayChildren: 0.2,
+            },
+          },
+        }}
+      >
+        <div className="voices-float-lanes">
+          {voiceLanes.map((lane, laneIndex) => {
+            const reviewGroups = getVoiceReviewGroups(lane.reviews);
+            return (
+              <div
+                key={`voice-lane-${lane.laneId}`}
+                className={`voices-lane voices-lane-${lane.laneId} ${runtimeFlags.visualRegressionMode ? 'is-static' : ''}`.trim()}
+              >
+                <div className="voices-float-track">
+                  {reviewGroups.map((reviewGroup, groupIndex) => (
+                    <div
+                      key={`voice-group-${lane.laneId}-${groupIndex}`}
+                      className="voices-float-group"
+                      aria-hidden={groupIndex > 0 ? true : undefined}
+                    >
+                      {reviewGroup.map((item, index) => {
+                        const reviewIndex =
+                          laneIndex * lane.reviews.length + groupIndex * lane.reviews.length + index;
+                        return (
+                          <motion.article
+                            key={`${lane.laneId}-${item.id}-${groupIndex}`}
+                            className={`voice-float-card tone-${(reviewIndex % 4) + 1} ${runtimeFlags.visualRegressionMode ? 'is-static' : ''}`.trim()}
+                            variants={{
+                              hidden: { opacity: 0 },
+                              visible: {
+                                opacity: 1,
+                                transition: {
+                                  duration: 0.5,
+                                  ease: cinematicEase,
+                                },
+                              },
+                            }}
+                          >
+                            <motion.header
+                              className="voice-float-head"
+                              transition={{ duration: 0.2 }}
+                            >
+                              <motion.img
+                                src={item.avatarUrl}
+                                alt={`${item.userName} profile picture`}
+                                loading="lazy"
+                                decoding="async"
+                                transition={{ duration: 0.2 }}
+                              />
+                              <div className="voice-float-user">
+                                <motion.h4
+                                  initial={{ opacity: 0 }}
+                                  whileInView={{ opacity: 1 }}
+                                  viewport={{ once: true }}
+                                  transition={{ delay: 0.28 }}
+                                >
+                                  {item.userName}
+                                </motion.h4>
+                                <motion.p
+                                  initial={{ opacity: 0 }}
+                                  whileInView={{ opacity: 1 }}
+                                  viewport={{ once: true }}
+                                  transition={{ delay: 0.34 }}
+                                >
+                                  {item.handle}
+                                </motion.p>
+                              </div>
+                            </motion.header>
+
+                            <div className="voice-float-topline">
+                              <motion.p
+                                className="voice-float-project"
+                                initial={{ opacity: 0, x: -8 }}
+                                whileInView={{ opacity: 1, x: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: 0.38 }}
+                              >
+                                {item.project}
+                              </motion.p>
+                              <motion.span
+                                className="voice-float-stars"
+                                aria-label={`${item.stars} star review`}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                whileInView={{ opacity: 1, scale: 1 }}
+                                viewport={{ once: true }}
+                                transition={{ duration: 0.25 }}
+                              >
+                                {'★'.repeat(item.stars)}
+                              </motion.span>
+                            </div>
+
+                            <motion.p
+                              className="voice-float-copy"
+                              initial={{ opacity: 0, y: 8 }}
+                              whileInView={{ opacity: 1, y: 0 }}
+                              viewport={{ once: true }}
+                              transition={{ delay: 0.42, duration: 0.45 }}
+                            >
+                              {item.review}
+                            </motion.p>
+                          </motion.article>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </header>
-
-            <div className="voice-float-topline">
-              <p className="voice-float-project">{item.project}</p>
-              <span className="voice-float-stars" aria-label={`${item.stars} star review`}>
-                {'★'.repeat(item.stars)}
-              </span>
-            </div>
-
-            <p className="voice-float-copy">"{item.review}"</p>
-          </motion.article>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      </motion.div>
     </section>
   </>
-);
+  );
+};
 
 const BlogsPage = ({ runtimeFlags, contentReady, blogsShouldLoad, skeletonBlogs }: BlogsPageProps) => (
   <>

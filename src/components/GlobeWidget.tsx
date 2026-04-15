@@ -1,48 +1,21 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  geoDistance,
-  geoGraticule10,
-  geoInterpolate,
-  geoOrthographic,
-  geoPath,
-} from 'd3-geo';
-import { interpolateNumber, interpolateRgb } from 'd3-interpolate';
-import { KEY_COUNTRY_CODES, fetchCountryMetrics, type CountryMetric } from '../lib/globeData';
+import { memo, useEffect, useRef, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { EnhancedThreeGlobeManager } from './globe/EnhancedThreeGlobeManager';
+import type { GlobeRegion, RegionCode, RenderLabel, RegionCluster } from './globe/types';
+import { fetchCountryMetrics } from '../lib/globeData';
 
 interface GlobeWidgetProps {
   className?: string;
   visualRegressionMode?: boolean;
 }
 
-type RegionCode = 'GBR' | 'IND' | 'USA' | 'JPN' | 'FRA';
-
-interface RegionPoint {
-  code: RegionCode;
-  label: string;
-  coordinates: [number, number];
-}
-
-interface RegionProjectionSnapshot extends RegionPoint {
-  x: number;
-  y: number;
-  frontFactor: number;
-  labelOpacity: number;
-  visibleOnGlobe: boolean;
-  renderOrder: number;
-  xPercent: number;
-  yPercent: number;
-}
-
-const WIDTH = 560;
-const HEIGHT = 560;
-
-const REGION_POINTS: RegionPoint[] = [
-  { code: 'GBR', label: 'United Kingdom', coordinates: [-2.0, 54.0] },
-  { code: 'IND', label: 'India', coordinates: [78.0, 20.0] },
-  { code: 'USA', label: 'United States', coordinates: [-95.0, 38.0] },
-  { code: 'JPN', label: 'Japan', coordinates: [138.0, 36.0] },
-  { code: 'FRA', label: 'France', coordinates: [2.2, 46.0] },
-];
+const REGION_POINTS: Record<RegionCode, { lat: number; lng: number }> = {
+  GBR: { lat: 54.0, lng: -2.0 },
+  IND: { lat: 20.0, lng: 78.0 },
+  USA: { lat: 38.0, lng: -95.0 },
+  JPN: { lat: 36.0, lng: 138.0 },
+  FRA: { lat: 46.0, lng: 2.2 },
+};
 
 const BASE_FEED: Record<RegionCode, { name: string; value: number }> = {
   GBR: { name: 'United Kingdom', value: 62 },
@@ -52,460 +25,287 @@ const BASE_FEED: Record<RegionCode, { name: string; value: number }> = {
   FRA: { name: 'France', value: 46 },
 };
 
-const BASE_VALUES: Record<RegionCode, number> = {
-  GBR: BASE_FEED.GBR.value,
-  IND: BASE_FEED.IND.value,
-  USA: BASE_FEED.USA.value,
-  JPN: BASE_FEED.JPN.value,
-  FRA: BASE_FEED.FRA.value,
-};
+const GlobeWidget = ({ className = '', visualRegressionMode }: GlobeWidgetProps) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const managerRef = useRef<EnhancedThreeGlobeManager | null>(null);
+  const navigate = useNavigate();
+  const navigationTimeoutRef = useRef<NodeJS.Timeout>();
 
-const isRegionCode = (code: string): code is RegionCode =>
-  code === 'GBR' || code === 'IND' || code === 'USA' || code === 'JPN' || code === 'FRA';
-
-const metricColor = (value: number): string => {
-  const normalized = Math.max(0, Math.min(1, value / 100));
-  return interpolateRgb('#11203f', '#5ca6ff')(normalized);
-};
-
-const toMetricsMap = (rows: CountryMetric[]): Record<RegionCode, { name: string; value: number }> => {
-  const next: Record<RegionCode, { name: string; value: number }> = {
-    GBR: { ...BASE_FEED.GBR },
-    IND: { ...BASE_FEED.IND },
-    USA: { ...BASE_FEED.USA },
-    JPN: { ...BASE_FEED.JPN },
-    FRA: { ...BASE_FEED.FRA },
-  };
-
-  rows.forEach((row) => {
-    if (isRegionCode(row.code) && KEY_COUNTRY_CODES.has(row.code)) {
-      next[row.code] = {
-        name: row.name,
-        value: row.value,
-      };
-    }
-  });
-
-  return next;
-};
-
-const GlobeWidget = ({ className, visualRegressionMode }: GlobeWidgetProps) => {
-  const [metrics, setMetrics] = useState<Record<RegionCode, { name: string; value: number }>>(() => ({
-    GBR: { ...BASE_FEED.GBR },
-    IND: { ...BASE_FEED.IND },
-    USA: { ...BASE_FEED.USA },
-    JPN: { ...BASE_FEED.JPN },
-    FRA: { ...BASE_FEED.FRA },
-  }));
-  const [displayValues, setDisplayValues] = useState<Record<RegionCode, number>>(() => ({ ...BASE_VALUES }));
-  const [rotation, setRotation] = useState(-16);
-  const [selectedCode, setSelectedCode] = useState<RegionCode>('IND');
+  const [metrics, setMetrics] = useState(BASE_FEED);
+  const [labels, setLabels] = useState<RenderLabel[]>([]);
   const [hoveredCode, setHoveredCode] = useState<RegionCode | null>(null);
-  const [, setTooltipCode] = useState<RegionCode | null>(null);
-  const [zoomed, setZoomed] = useState(false);
-  const [targetRotation, setTargetRotation] = useState(-16);
-  const displayRef = useRef(displayValues);
+  const [selectedCode, setSelectedCode] = useState<RegionCode | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
 
+  // Fetch metrics on mount
   useEffect(() => {
-    displayRef.current = displayValues;
-  }, [displayValues]);
-
-  useEffect(() => {
-    if (visualRegressionMode) {
-      return;
+    if (!visualRegressionMode) {
+      fetchCountryMetrics().then(rows => {
+        const next = { ...BASE_FEED };
+        rows.forEach(r => {
+          if (next[r.code as RegionCode]) {
+            next[r.code as RegionCode].value = r.value;
+          }
+        });
+        setMetrics(next);
+      }).catch(e => console.error('GlobeWidget: Metrics fetch error', e));
     }
-
-    let disposed = false;
-
-    const load = async () => {
-      const rows = await fetchCountryMetrics();
-      if (!disposed) {
-        setMetrics(toMetricsMap(rows));
-      }
-    };
-
-    load();
-    const poll = window.setInterval(load, 60_000);
-
-    return () => {
-      disposed = true;
-      window.clearInterval(poll);
-    };
   }, [visualRegressionMode]);
 
-  useEffect(() => {
-    const sourceMetrics = visualRegressionMode ? BASE_FEED : metrics;
-    const targetValues: Record<RegionCode, number> = {
-      GBR: sourceMetrics.GBR.value,
-      IND: sourceMetrics.IND.value,
-      USA: sourceMetrics.USA.value,
-      JPN: sourceMetrics.JPN.value,
-      FRA: sourceMetrics.FRA.value,
-    };
+  // Handle region click with smooth transition
+  const handleRegionClick = useCallback((code: RegionCode, cluster?: RegionCluster) => {
+    setSelectedCode(code);
+    setIsNavigating(true);
 
-    if (visualRegressionMode) {
-      displayRef.current = targetValues;
-      return;
+    // Trigger smooth transition before navigation
+    navigationTimeoutRef.current = setTimeout(() => {
+      navigate(`/work/${code.toLowerCase()}`, {
+        state: { sourceRegion: code, clusterInfo: cluster }
+      });
+    }, 300);
+  }, [navigate]);
+
+  // Handle error with user feedback
+  const handleError = useCallback((error: Error) => {
+    console.error('GlobeWidget Error:', error);
+    // TODO: Show toast or error boundary
+  }, []);
+
+  // Initialize globe manager
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    if (!managerRef.current) {
+      try {
+        managerRef.current = new EnhancedThreeGlobeManager(
+          containerRef.current,
+          (code) => setHoveredCode(code),
+          handleRegionClick,
+          (labelData) => setLabels(labelData),
+          {
+            accessibilityConfig: { ariaLabels: true, keyboardNavigation: true },
+            performanceConfig: { targetFPS: 60, maxPixelRatio: 2 }
+          },
+          handleError
+        );
+
+        const initialData: GlobeRegion[] = Object.keys(REGION_POINTS).map((code) => ({
+          code: code as RegionCode,
+          label: BASE_FEED[code as RegionCode].name,
+          lat: REGION_POINTS[code as RegionCode].lat,
+          lng: REGION_POINTS[code as RegionCode].lng,
+          value: BASE_FEED[code as RegionCode].value,
+        }));
+        managerRef.current.updateData(initialData);
+      } catch (error) {
+        handleError(error as Error);
+      }
     }
 
-    const startValues = displayRef.current;
-    const start = performance.now();
-    const duration = 850;
-    let frameId = 0;
-
-    const tick = (time: number) => {
-      const progress = Math.max(0, Math.min(1, (time - start) / duration));
-      const nextValues: Record<RegionCode, number> = {
-        GBR: interpolateNumber(startValues.GBR, targetValues.GBR)(progress),
-        IND: interpolateNumber(startValues.IND, targetValues.IND)(progress),
-        USA: interpolateNumber(startValues.USA, targetValues.USA)(progress),
-        JPN: interpolateNumber(startValues.JPN, targetValues.JPN)(progress),
-        FRA: interpolateNumber(startValues.FRA, targetValues.FRA)(progress),
-      };
-
-      setDisplayValues(nextValues);
-      displayRef.current = nextValues;
-
-      if (progress < 1) {
-        frameId = window.requestAnimationFrame(tick);
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+      if (managerRef.current) {
+        managerRef.current.dispose();
+        managerRef.current = null;
       }
     };
+  }, [handleRegionClick, handleError]);
 
-    frameId = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frameId);
-  }, [metrics, visualRegressionMode]);
-
+  // Update globe data when metrics change
   useEffect(() => {
-    if (visualRegressionMode) {
-      return;
+    if (managerRef.current) {
+      const data: GlobeRegion[] = Object.keys(REGION_POINTS).map((code) => ({
+        code: code as RegionCode,
+        label: metrics[code as RegionCode].name,
+        lat: REGION_POINTS[code as RegionCode].lat,
+        lng: REGION_POINTS[code as RegionCode].lng,
+        value: metrics[code as RegionCode].value,
+        description: `Services available in ${metrics[code as RegionCode].name}`
+      }));
+      managerRef.current.updateData(data);
     }
+  }, [metrics]);
 
-    let last = performance.now();
-    let frameId = 0;
-
-    const tick = (time: number) => {
-      const delta = time - last;
-      last = time;
-      setRotation((current) => {
-        const diff = targetRotation - current;
-        if (Math.abs(diff) < 0.1) {
-          return targetRotation;
-        }
-        return current + diff * 0.08;
-      });
-      frameId = window.requestAnimationFrame(tick);
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frameId);
-  }, [visualRegressionMode, targetRotation]);
-
-  const projection = useMemo(
-    () =>
-      geoOrthographic()
-        .translate([WIDTH / 2, HEIGHT / 2])
-        .scale(WIDTH * (zoomed ? 0.47 : 0.43))
-        .clipAngle(90)
-        .rotate([rotation, -18, 0]),
-    [rotation, zoomed],
-  );
-
-  const calculateLabelPosition = (point: RegionProjectionSnapshot) => {
-    const offsetDistance = 35;
-    const angle = Math.atan2(point.y - HEIGHT / 2, point.x - WIDTH / 2);
-    const offsetX = Math.cos(angle) * offsetDistance;
-    const offsetY = Math.sin(angle) * offsetDistance;
-    
-    return {
-      x: point.x + offsetX,
-      y: point.y + offsetY,
-      angle: angle * (180 / Math.PI),
-    };
+  const getCursor = () => {
+    if (isNavigating) return 'wait';
+    if (hoveredCode) return 'pointer';
+    return 'grab';
   };
 
-  const centerCoords = projection.invert
-    ? (projection.invert([WIDTH / 2, HEIGHT / 2]) as [number, number] | null)
-    : null;
-
-  const projectionSnapshots = useMemo(() => {
-    return REGION_POINTS.map((point) => {
-      const projected = projection(point.coordinates);
-      if (!projected) {
-        return null;
-      }
-
-      const depthAngle = centerCoords ? geoDistance(centerCoords, point.coordinates) : 0;
-      const normalizedFrontFactor = centerCoords
-        ? Math.max(0, 1 - depthAngle / (Math.PI / 2))
-        : 1;
-      const labelOpacity = 0.8 + Math.min(1, normalizedFrontFactor) * 0.2;
-      const visibleOnGlobe = !centerCoords || depthAngle <= Math.PI / 2;
-      const renderOrder = 1000 + Math.round(normalizedFrontFactor * 100);
-      const xPercent = Math.max(8, Math.min(92, (projected[0] / WIDTH) * 100));
-      const yPercent = Math.max(8, Math.min(92, (projected[1] / HEIGHT) * 100));
-
-      return {
-        ...point,
-        x: projected[0],
-        y: projected[1],
-        frontFactor: normalizedFrontFactor,
-        labelOpacity,
-        visibleOnGlobe,
-        renderOrder,
-        xPercent,
-        yPercent,
-      } as RegionProjectionSnapshot;
-    }).filter((point): point is RegionProjectionSnapshot => point !== null);
-  }, [centerCoords, projection]);
-
-  const visiblePoints = useMemo(
-    () => projectionSnapshots.filter((point) => point.visibleOnGlobe),
-    [projectionSnapshots],
-  );
-
-  const labelAnchors = useMemo(
-    () =>
-      projectionSnapshots
-        .slice()
-        .sort((left, right) => right.frontFactor - left.frontFactor),
-    [projectionSnapshots],
-  );
-
-  const pathBuilder = useMemo(() => geoPath(projection), [projection]);
-
-  const graticulePath = useMemo(() => pathBuilder(geoGraticule10()) || '', [pathBuilder]);
-
-  const arcs = useMemo(() => {
-    const origin = REGION_POINTS.find((point) => point.code === selectedCode) ?? REGION_POINTS[1];
-
-    return REGION_POINTS.filter((point) => point.code !== origin.code)
-      .map((target) => {
-        const interpolate = geoInterpolate(origin.coordinates, target.coordinates);
-        const projected = Array.from({ length: 24 }, (_, index) => interpolate(index / 23))
-          .map((geoPoint) => projection(geoPoint as [number, number]))
-          .filter((point): point is [number, number] => point !== null);
-
-        if (projected.length < 2) {
-          return null;
-        }
-
-        const d = projected
-          .map((point, index) => `${index === 0 ? 'M' : 'L'}${point[0].toFixed(2)},${point[1].toFixed(2)}`)
-          .join(' ');
-
-        return {
-          id: `${origin.code}-${target.code}`,
-          d,
-        };
-      })
-      .filter((item): item is { id: string; d: string } => item !== null);
-  }, [projection, selectedCode]);
-
-
-  const effectiveValues = visualRegressionMode ? BASE_VALUES : displayValues;   
-
-  const selectedDisplayValue = Math.round(effectiveValues[selectedCode]);       
+  // Get country code abbreviations
+  const getCountryCode = (code: RegionCode): string => {
+    const codes: Record<RegionCode, string> = {
+      GBR: 'GB',
+      IND: 'IN',
+      USA: 'US',
+      JPN: 'JP',
+      FRA: 'FR'
+    };
+    return codes[code];
+  };
 
   return (
-    <div className={`globe-widget ${className || ''}`.trim()}>
-      <div className="globe-stage">
-        <svg
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          className="globe-svg"
-          role="img"
-          aria-label="Interactive globe feed"
+    <div 
+      className={`relative ${className}`} 
+      style={{ 
+        width: '100%', 
+        height: '560px', 
+        overflow: 'hidden',
+        opacity: isNavigating ? 0.95 : 1,
+        transition: 'opacity 300ms ease-out',
+        display: 'flex',
+        gap: '1.5rem',
+        padding: '1.5rem'
+      }}
+    >
+      {/* Globe Container - Left Side */}
+      <div 
+        ref={containerRef} 
+        style={{ 
+          flex: 1,
+          cursor: getCursor(),
+          borderRadius: '1.25rem',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0, 100, 200, 0.2)'
+        }} 
+        role="application"
+        aria-label="Interactive globe widget"
+      />
+      
+      {/* Right Side Panel - Countries & Labels */}
+      <div 
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          width: '140px',
+          zIndex: 15,
+          justifyContent: 'center'
+        }}
+      >
+        {/* Country Pills */}
+        <div 
+          className="globe-country-pills"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.6rem',
+            pointerEvents: 'auto'
+          }}
         >
-        <defs>
-          {/* Realistic spherical gradient with topographic shading */}
-          <radialGradient id="globeSphere" cx="40%" cy="35%" r="75%">
-            <stop offset="0%" stopColor="#3d6b99" stopOpacity="1" />
-            <stop offset="20%" stopColor="#2d5a88" stopOpacity="1" />
-            <stop offset="50%" stopColor="#1d4a78" stopOpacity="1" />
-            <stop offset="75%" stopColor="#0d2a48" stopOpacity="1" />
-            <stop offset="100%" stopColor="#051020" stopOpacity="1" />
-          </radialGradient>
-          <radialGradient id="globeGlow" cx="50%" cy="40%" r="65%">
-            <stop offset="0%" stopColor="#1e3a5f" stopOpacity="0.8" />
-            <stop offset="60%" stopColor="#0a1428" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-          </radialGradient>
-          <filter id="realisticGlow">
-            <feGaussianBlur stdDeviation="1.5" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          <filter id="dotGlow">
-            <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.6" floodColor="#64b5f6" />
-          </filter>
-          <filter id="labelRealisticGlow">
-            <feGaussianBlur stdDeviation="1" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
+          {Object.entries(BASE_FEED).map(([code, { name }]) => (
+            <button
+              key={code}
+              onClick={() => handleRegionClick(code as RegionCode)}
+              onMouseEnter={() => setHoveredCode(code as RegionCode)}
+              onMouseLeave={() => setHoveredCode(null)}
+              className={`globe-country-badge ${
+                selectedCode === code ? 'is-active' : ''
+              } ${hoveredCode === code ? 'is-hovered' : ''}`}
+              aria-label={`Navigate to ${name}`}
+              style={{
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                border: '1px solid rgba(100, 200, 255, 0.2)',
+                background: selectedCode === code 
+                  ? 'rgba(160, 88, 40, 0.3)' 
+                  : hoveredCode === code
+                  ? 'rgba(100, 200, 255, 0.15)'
+                  : 'rgba(255, 255, 255, 0.05)',
+                color: selectedCode === code 
+                  ? '#d99763'
+                  : hoveredCode === code
+                  ? '#58a6ff'
+                  : '#9097a3',
+                fontSize: '0.75rem',
+                fontWeight: selectedCode === code ? 600 : 500,
+                cursor: 'pointer',
+                transition: 'all 200ms ease',
+                textAlign: 'left',
+                boxShadow: hoveredCode === code 
+                  ? '0 0 16px rgba(100, 200, 255, 0.3)'
+                  : 'none',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: '0.7rem' }}>
+                {getCountryCode(code as RegionCode)}
+              </div>
+              <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>
+                {name}
+              </div>
+            </button>
+          ))}
+        </div>
 
-        <circle
-          cx={WIDTH / 2}
-          cy={HEIGHT / 2}
-          r={WIDTH * 0.43}
-          fill="url(#globeSphere)"
-          stroke="#5a8ec4"
-          strokeOpacity={0.35}
-          strokeWidth={1.2}
-          filter="url(#realisticGlow)"
-        />
-
-        <circle cx={WIDTH / 2} cy={HEIGHT / 2} r={WIDTH * 0.48} fill="url(#globeGlow)" aria-hidden="true" />
-
-        <path d={graticulePath} fill="none" stroke="#3a5a8a" strokeOpacity={0.25} strokeWidth={0.6} />
-
-        {arcs.map((arc) => (
-          <g key={arc.id}>
-            <path d={arc.d} className="globe-route-professional" />
-          </g>
-        ))}
-
-        {visiblePoints.map((point) => {
-          const value = Math.round(effectiveValues[point.code]);
-          const isActive = selectedCode === point.code;
-          const labelPos = calculateLabelPosition(point);
-
-          return (
-            <g key={point.code}>
-              {/* Professional data point dot */}
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r={isActive ? 5.5 : 4}
-                fill="#5a9ddf"
-                stroke="#e8f4ff"
-                strokeOpacity={0.9}
-                strokeWidth={1.2}
-                filter="url(#dotGlow)"
-                style={{
-                  cursor: 'pointer',
-                  transition: 'all 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-                }}
-                onPointerEnter={() => setTooltipCode(point.code)}
-                onPointerLeave={() => setTooltipCode(null)}
-                onClick={() => {
-                  setSelectedCode(point.code);
-                  setZoomed(true);
-                  setTargetRotation(-point.coordinates[0]);
-                }}
-              />
-              {/* Subtle outer ring for active state */}
-              {isActive && (
-                <circle
-                  cx={point.x}
-                  cy={point.y}
-                  r={7.5}
-                  fill="none"
-                  stroke="#5a9ddf"
-                  strokeOpacity={0.25}
-                  strokeWidth={1}
-                  style={{
-                    animation: 'pulse-subtle 2s ease-in-out infinite',
-                  }}
-                />
-              )}
-              {/* Connection line from dot to label */}
-              {isActive && (
-                <line
-                  x1={point.x}
-                  y1={point.y}
-                  x2={labelPos.x}
-                  y2={labelPos.y}
-                  stroke="#5a9ddf"
-                  strokeWidth={0.7}
-                  strokeOpacity={0.3}
-                  strokeDasharray="2,3"
-                />
-              )}
-              {/* Professional label box with smart positioning */}
-              <g className="globe-label-group" style={{ pointerEvents: 'none' }}>
-                <rect
-                  x={labelPos.x - 50}
-                  y={labelPos.y - 14}
-                  width={100}
-                  height={22}
-                  rx={4}
-                  fill="rgba(10, 20, 40, 0.92)"
-                  stroke={isActive ? '#5a9ddf' : '#3a5a8a'}
-                  strokeWidth={isActive ? 1.2 : 0.8}
-                  strokeOpacity={isActive ? 0.8 : 0.5}
-                  filter="url(#labelRealisticGlow)"
-                  style={{
-                    transition: 'all 250ms ease-out',
-                  }}
-                />
-                <text
-                  x={labelPos.x}
-                  y={labelPos.y + 2}
-                  fill={isActive ? '#a8d4ff' : '#8ab8e6'}
-                  fontSize="12"
-                  fontWeight={isActive ? '700' : '600'}
-                  textAnchor="middle"
-                  pointerEvents="none"
-                  style={{
-                    transition: 'fill 250ms ease, font-weight 250ms ease',
-                    fontFamily: "'Segoe UI', 'Helvetica Neue', sans-serif",
-                    letterSpacing: '0.4px',
-                  }}
-                >
-                  {point.label}
-                </text>
-              </g>
-            </g>
-          );
-        })}
-      </svg>
-
-      <div className="globe-label-layer" aria-hidden="true">
-        {labelAnchors.map((anchor) => (
-          <div
-            key={`label-${anchor.code}`}
-            className="globe-label-chip"
-            data-render-order={anchor.renderOrder}
+        {/* Remote Location Info */}
+        {selectedCode && (
+          <div 
             style={{
-              left: `${anchor.xPercent}%`,
-              top: `${anchor.yPercent}%`,
-              opacity: anchor.labelOpacity,
-              zIndex: anchor.renderOrder,
+              marginTop: '1rem',
+              paddingTop: '1rem',
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              fontSize: '0.7rem',
+              color: '#9097a3',
+              textAlign: 'center'
             }}
           >
-            {anchor.label}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center', marginBottom: '0.3rem' }}>
+              <span>📍</span>
+              <span>REMOTE</span>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#b0c4df', fontWeight: 500 }}>
+              {BASE_FEED[selectedCode as RegionCode]?.name}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Animated Labels Layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        aria-hidden="true"
+        style={{ padding: '1.5rem' }}
+      >
+        {labels.map(l => (
+          <div
+            key={l.code}
+            className="absolute transition-all duration-300 transform -translate-x-1/2 -translate-y-1/2"
+            style={{ 
+              left: `${l.x}px`, 
+              top: `${l.y}px`,
+              opacity: l.visible ? l.textOpacity : 0,
+              scale: l.scale,
+              fontSize: `${l.fontSize}px`,
+              zIndex: l.hovered ? 20 : 10,
+              textShadow: l.hovered 
+                ? '0 0 12px rgba(88, 166, 255, 0.6)' 
+                : '0 2px 8px rgba(0,0,0,0.8)',
+              color: l.hovered ? '#58a6ff' : '#b0c4df',
+              fontWeight: l.hovered ? 700 : 500,
+              fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
+              letterSpacing: l.hovered ? '0.5px' : '0px',
+              textTransform: 'capitalize',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {l.label}
           </div>
         ))}
       </div>
-    </div>
-    
-    <aside className="globe-sidebar">
-      <div className="globe-country-pills" role="tablist" aria-label="Region focus">
-        {REGION_POINTS.map((point) => (
-          <button
-            key={point.code}
-            type="button"
-            role="tab"
-            aria-selected={selectedCode === point.code}
-            className={`globe-pill ${selectedCode === point.code ? 'is-active' : ''} ${hoveredCode === point.code ? 'is-hovered' : ''}`}
-            onMouseEnter={() => setHoveredCode(point.code)}
-            onMouseLeave={() => setHoveredCode(null)}
-            onClick={() => {
-              setSelectedCode(point.code);
-              setZoomed(true);
-              setTargetRotation(-point.coordinates[0]);
-            }}
-          >
-            {point.code === 'GBR' ? 'GB UK' : point.code === 'IND' ? 'IN India' : point.code === 'USA' ? 'US USA' : point.label}
-          </button>
-        ))}
-      </div>
-    </aside>
+
+      {/* Loading Indicator */}
+      {isNavigating && (
+        <div 
+          className="absolute inset-0 flex items-center justify-center bg-black/20"
+          aria-live="polite"
+        >
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-400 border-t-blue-500" />
+        </div>
+      )}
     </div>
   );
 };
