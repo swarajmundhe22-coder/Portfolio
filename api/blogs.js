@@ -108,7 +108,7 @@ export default createSecureHandler(
         .from('blogs')
         .select('slug, title, excerpt, content, featured_image_url, publish_date_iso, author_name')
         .order('publish_date_iso', { ascending: false })
-        .limit(6);
+        .limit(8);
 
       if (error || !Array.isArray(data) || data.length === 0) {
         return res.status(200).json({ posts: fallbackPosts });

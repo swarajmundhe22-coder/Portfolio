@@ -95,7 +95,7 @@ interface HomePageProps {
   githubProfileHref: string;
   issuesHref: string;
   emailHref: string;
-  openContactModal: () => void;
+  goToContactPage: () => void;
   heroY: MotionValue<number>;
   heroOpacity: MotionValue<number>;
   heroLeadY: MotionValue<number>;
@@ -460,7 +460,7 @@ const HomePage = ({
   githubProfileHref,
   issuesHref,
   emailHref,
-  openContactModal,
+  goToContactPage,
   heroY,
   heroOpacity,
   heroLeadY,
@@ -602,7 +602,7 @@ const HomePage = ({
         <a className="mail-link" href={emailHref}>
           {profileIdentity.email}
         </a>
-        <button type="button" data-cta-type="primary" onClick={openContactModal}>
+        <button type="button" data-cta-type="primary" onClick={goToContactPage}>
           Request collaboration
         </button>
       </motion.article>
@@ -1829,7 +1829,7 @@ export default function App() {
   const contributionTotal = 1159;
 
   const skeletonCards = useMemo(() => Array.from({ length: 4 }, (_, index) => index), []);
-  const skeletonBlogs = useMemo(() => Array.from({ length: 6 }, (_, index) => index), []);
+  const skeletonBlogs = useMemo(() => Array.from({ length: 8 }, (_, index) => index), []);
 
   const githubProfileHref =
     socialHandles.find((item) => item.label === 'GitHub Profile')?.href ??
@@ -2329,7 +2329,7 @@ export default function App() {
                       githubProfileHref={githubProfileHref}
                       issuesHref={issuesHref}
                       emailHref={emailHref}
-                      openContactModal={openContactModal}
+                      goToContactPage={() => goToRoute('contact')}
                       heroY={heroY}
                       heroOpacity={heroOpacity}
                       heroLeadY={heroLeadY}

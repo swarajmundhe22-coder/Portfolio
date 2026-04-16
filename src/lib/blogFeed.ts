@@ -1,3 +1,5 @@
+import { blogPosts } from '../data/portfolioData';
+
 export interface RawBlogPost {
   slug?: string;
   title?: string;
@@ -20,6 +22,7 @@ export interface BlogPostModel {
 }
 
 const fallbackImage = '/project-2.jpg';
+const maxBlogPosts = 8;
 
 const normalizeSlug = (value: string): string =>
   value
@@ -91,7 +94,7 @@ export const normalizeBlogPosts = (rows: RawBlogPost[]): BlogPostModel[] =>
       };
     })
     .sort((a, b) => Date.parse(b.publishDateIso) - Date.parse(a.publishDateIso))
-    .slice(0, 6);
+    .slice(0, maxBlogPosts);
 
 const toLocaleDate = (isoDate: string): string =>
   new Intl.DateTimeFormat('en-US', {
@@ -100,8 +103,8 @@ const toLocaleDate = (isoDate: string): string =>
     year: 'numeric',
   }).format(new Date(isoDate));
 
-const extractReadingTime = (excerpt: string): string => {
-  const words = excerpt.split(/\s+/).filter(Boolean).length;
+const extractReadingTime = (excerpt: string, content: string[]): string => {
+  const words = `${excerpt} ${content.join(' ')}`.split(/\s+/).filter(Boolean).length;
   const minutes = Math.max(1, Math.ceil(words / 120));
   return `${minutes} MIN READ`;
 };
@@ -123,8 +126,71 @@ export const toRenderedBlogPosts = (posts: BlogPostModel[]): RenderedBlogPost[] 
   posts.map((post) => ({
     ...post,
     publishDateLabel: toLocaleDate(post.publishDateIso),
-    readTimeLabel: extractReadingTime(post.excerpt),
+    readTimeLabel: extractReadingTime(post.excerpt, post.content),
   }));
+
+const countWords = (content: string[]): number =>
+  content.join(' ').split(/\s+/).filter(Boolean).length;
+
+const curatedFallbackPosts: RenderedBlogPost[] = blogPosts
+  .map((post, index) => {
+    const featuredImageUrl = `/project-${(index % 4) + 1}.jpg`;
+    const publishDateIso = ensureIso(post.date);
+    const content = ensureContent(post.content, post.excerpt);
+
+    return {
+      slug: normalizeSlug(post.title),
+      title: post.title,
+      excerpt: ensureExcerpt(post.excerpt),
+      content,
+      featuredImageUrl,
+      featuredImageSet: `${featuredImageUrl} 1x, ${featuredImageUrl} 2x`,
+      publishDateIso,
+      publishDateLabel: toLocaleDate(publishDateIso),
+      readTimeLabel: extractReadingTime(post.excerpt, content),
+      authorName: 'Swaraj Mundhe',
+    };
+  })
+  .sort((a, b) => Date.parse(b.publishDateIso) - Date.parse(a.publishDateIso))
+  .slice(0, maxBlogPosts);
+
+const mergeWithCuratedFallback = (remotePosts: RenderedBlogPost[]): RenderedBlogPost[] => {
+  const curatedBySlug = new Map(curatedFallbackPosts.map((post) => [post.slug, post]));
+
+  const mergedRemote = remotePosts.map((post) => {
+    const curated = curatedBySlug.get(post.slug) ?? curatedBySlug.get(normalizeSlug(post.title));
+    if (!curated) {
+      return post;
+    }
+
+    const remoteWordCount = countWords(post.content);
+    const curatedWordCount = countWords(curated.content);
+    const remoteAlreadyDetailed = remoteWordCount >= 220;
+
+    if (remoteAlreadyDetailed || curatedWordCount <= remoteWordCount) {
+      return post;
+    }
+
+    return {
+      ...post,
+      title: curated.title,
+      excerpt: curated.excerpt,
+      content: curated.content,
+      readTimeLabel: curated.readTimeLabel,
+      authorName: post.authorName === 'Unknown Author' ? curated.authorName : post.authorName,
+    };
+  });
+
+  const seen = new Set(mergedRemote.map((post) => post.slug));
+  const withMissingCurated = [
+    ...mergedRemote,
+    ...curatedFallbackPosts.filter((post) => !seen.has(post.slug)),
+  ];
+
+  return withMissingCurated
+    .sort((a, b) => Date.parse(b.publishDateIso) - Date.parse(a.publishDateIso))
+    .slice(0, maxBlogPosts);
+};
 
 const blogEndpoint = '/api/blogs';
 
@@ -145,5 +211,5 @@ export const fetchBlogPosts = async (signal?: AbortSignal): Promise<RenderedBlog
   const payload = (await response.json()) as { posts?: RawBlogPost[] } | RawBlogPost[];
   const rows = Array.isArray(payload) ? payload : payload.posts ?? [];
 
-  return toRenderedBlogPosts(normalizeBlogPosts(rows));
+  return mergeWithCuratedFallback(toRenderedBlogPosts(normalizeBlogPosts(rows)));
 };

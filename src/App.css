@@ -3464,6 +3464,21 @@
 	letter-spacing: -0.02em;
 }
 
+.blog-card-audience {
+	margin: 0;
+	display: inline-flex;
+	align-items: center;
+	width: fit-content;
+	padding: 0.2rem 0.56rem;
+	border-radius: 999px;
+	border: 1px solid rgba(171, 196, 244, 0.34);
+	background: rgba(72, 103, 171, 0.14);
+	color: #c6d8f8;
+	font-size: 0.66rem;
+	text-transform: uppercase;
+	letter-spacing: 0.09em;
+}
+
 .blog-card-link > p {
 	margin: 0;
 	color: #b7bcc8;
@@ -3602,6 +3617,316 @@
 	font-size: clamp(0.98rem, 1.35vw, 1.08rem);
 	line-height: 1.8;
 	color: #d5dceb;
+}
+
+.blog-playbook {
+	margin-top: 0.5rem;
+	padding-top: 1rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.12);
+	display: grid;
+	gap: 0.85rem;
+}
+
+.blog-playbook-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.8rem;
+	flex-wrap: wrap;
+}
+
+.blog-playbook-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.42rem;
+	flex-wrap: wrap;
+}
+
+.blog-playbook-kicker {
+	margin: 0;
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	color: #8ca5c9;
+}
+
+.blog-playbook-header h2 {
+	margin: 0.1rem 0 0;
+	font-size: clamp(1.2rem, 2.2vw, 1.65rem);
+	line-height: 1.2;
+	letter-spacing: -0.01em;
+}
+
+.blog-playbook-copy {
+	border: 1px solid rgba(124, 160, 255, 0.4);
+	background: rgba(84, 126, 244, 0.16);
+	color: #e8f0ff;
+	border-radius: 999px;
+	padding: 0.42rem 0.8rem;
+	font-size: 0.75rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.blog-playbook-copy.is-secondary {
+	border-color: rgba(139, 208, 169, 0.42);
+	background: rgba(66, 129, 99, 0.18);
+	color: #dcf7e8;
+}
+
+.blog-playbook-problem {
+	margin: 0;
+	line-height: 1.68;
+	color: #ccdae9;
+}
+
+.blog-playbook-audience {
+	display: grid;
+	gap: 0.48rem;
+	padding: 0.72rem;
+	border-radius: 0.76rem;
+	border: 1px solid rgba(124, 160, 255, 0.2);
+	background: rgba(48, 78, 148, 0.12);
+}
+
+.blog-playbook-audience-line {
+	margin: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.36rem;
+	font-size: 0.9rem;
+	letter-spacing: 0.01em;
+	color: #e1ebff;
+}
+
+.blog-audience-tag-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.42rem;
+}
+
+.blog-audience-tag {
+	padding: 0.24rem 0.58rem;
+	border-radius: 999px;
+	border: 1px solid rgba(181, 204, 245, 0.35);
+	background: rgba(13, 20, 35, 0.48);
+	font-size: 0.7rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #bed1f3;
+}
+
+.blog-playbook-usecase {
+	margin: 0;
+	font-size: 0.92rem;
+	line-height: 1.58;
+	color: #cad8ef;
+}
+
+.blog-playbook-progress {
+	margin: 0;
+	font-size: 0.76rem;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+	color: #8fa0bb;
+}
+
+.blog-playbook-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.85rem;
+}
+
+.blog-playbook-card {
+	border-radius: 0.85rem;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: rgba(10, 13, 19, 0.84);
+	padding: 0.85rem;
+	display: grid;
+	gap: 0.65rem;
+}
+
+.blog-playbook-card h3 {
+	margin: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.32rem;
+	font-size: 0.86rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: #9db4d8;
+}
+
+.blog-scorecard-help {
+	margin: 0;
+	line-height: 1.56;
+	font-size: 0.92rem;
+	color: #ced8ea;
+}
+
+.blog-scorecard-list {
+	display: grid;
+	gap: 0.58rem;
+}
+
+.blog-scorecard-row {
+	display: grid;
+	gap: 0.34rem;
+	padding: 0.52rem;
+	border-radius: 0.62rem;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.02);
+}
+
+.blog-scorecard-label {
+	font-size: 0.8rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: #a8bbdb;
+}
+
+.blog-scorecard-row input[type='range'] {
+	width: 100%;
+	accent-color: #7d9dff;
+}
+
+.blog-scorecard-meta {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.55rem;
+	color: #d5def0;
+}
+
+.blog-scorecard-meta small {
+	font-size: 0.82rem;
+	line-height: 1.45;
+	color: #bfccdf;
+}
+
+.blog-scorecard-meta strong {
+	font-size: 0.82rem;
+	letter-spacing: 0.06em;
+	color: #e9effa;
+}
+
+.blog-scorecard-total {
+	margin: 0;
+	padding: 0.54rem 0.65rem;
+	border-radius: 0.6rem;
+	border: 1px solid rgba(164, 206, 244, 0.34);
+	background: rgba(77, 112, 161, 0.17);
+	font-size: 0.88rem;
+	line-height: 1.5;
+	color: #d5e9ff;
+}
+
+.blog-checklist {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 0.55rem;
+}
+
+.blog-checklist li {
+	margin: 0;
+}
+
+.blog-checklist label {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: start;
+	gap: 0.55rem;
+	line-height: 1.58;
+	color: #d8deec;
+	font-size: 0.95rem;
+}
+
+.blog-checklist input[type='checkbox'] {
+	margin-top: 0.1rem;
+	width: 0.98rem;
+	height: 0.98rem;
+	accent-color: #7d9dff;
+}
+
+.blog-action-plan,
+.blog-faq-list {
+	display: grid;
+	gap: 0.52rem;
+}
+
+.blog-step,
+.blog-faq-item {
+	border-radius: 0.72rem;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: rgba(255, 255, 255, 0.03);
+	padding: 0.58rem 0.72rem;
+}
+
+.blog-step summary,
+.blog-faq-item summary {
+	cursor: pointer;
+	font-weight: 600;
+	line-height: 1.45;
+	color: #eef3ff;
+}
+
+.blog-step p,
+.blog-faq-item p {
+	margin: 0.5rem 0 0;
+	line-height: 1.62;
+	color: #ccd7ea;
+}
+
+.blog-step-outcome {
+	font-size: 0.9rem;
+	color: #a8d8be !important;
+}
+
+.blog-pitfalls {
+	margin: 0;
+	padding-left: 1rem;
+	display: grid;
+	gap: 0.45rem;
+	line-height: 1.56;
+	color: #d7deea;
+}
+
+.blog-template-list {
+	margin: 0;
+	padding-left: 1rem;
+	display: grid;
+	gap: 0.42rem;
+	line-height: 1.56;
+	color: #d2deed;
+}
+
+.blog-success-signal {
+	margin: 0;
+	padding: 0.62rem 0.68rem;
+	border-radius: 0.64rem;
+	border: 1px solid rgba(126, 178, 144, 0.38);
+	background: rgba(52, 105, 79, 0.16);
+	line-height: 1.55;
+	color: #c7f2d5;
+}
+
+@media (max-width: 920px) {
+	.blog-playbook-actions {
+		width: 100%;
+	}
+
+	.blog-playbook-copy {
+		justify-content: center;
+	}
+
+	.blog-playbook-grid {
+		grid-template-columns: 1fr;
+	}
 }
 
 .labs-route-page {
@@ -5906,7 +6231,17 @@
 	}
 }
 
-body, html, * { cursor: url('/new-cursor-final.png') 0 0, auto; } a, button { cursor: url('/new-cursor-final.png') 0 0, pointer !important; }
+body,
+html,
+* {
+	cursor: url('/cursor-icon.png') 12 12, auto;
+}
+
+a,
+button,
+[role='button'] {
+	cursor: url('/cursor-icon.png') 12 12, pointer !important;
+}
 
 
 

@@ -20,6 +20,23 @@ const toSlug = (value: string): string =>
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 
+const audienceBySlug: Record<string, string> = {
+  'why-react-threejs-real-time-simulation-for-infrastructure-intelligence': 'Founders and infrastructure teams',
+  'frame-matching-a-portfolio-from-video-only': 'Frontend teams',
+  'design-drift-is-a-ci-problem-not-a-qa-problem': 'Frontend platform and QA teams',
+  'design-drift-is-a-ci-problem': 'Frontend platform and QA teams',
+  'building-reliable-contact-pipelines-with-supabase': 'Founders and product teams',
+  'motion-values-that-feel-premium-at-60-fps': 'Frontend and design-system teams',
+  'responsive-qa-checklist-for-320-to-1440-widths': 'QA and product delivery teams',
+  'accessibility-contrast-audits-without-guesswork': 'Product and accessibility teams',
+  'debugging-frontend-incidents-before-users-notice': 'Frontend incident response teams',
+};
+
+const resolveAudienceLabel = (post: RenderedBlogPost): string =>
+  audienceBySlug[post.slug] ??
+  audienceBySlug[toSlug(post.title)] ??
+  'Product and engineering teams';
+
 const staticFallbackPosts: RenderedBlogPost[] = blogPosts.map((post, index) => {
   const imageNumber = (index % 4) + 1;
   const publishDateIso = new Date(post.date).toISOString();
@@ -144,6 +161,7 @@ const DynamicBlogCards = ({
                   <ArrowUpRight size={16} />
                 </header>
                 <h3>{post.title}</h3>
+                <p className="blog-card-audience">For {resolveAudienceLabel(post)}</p>
                 <p>{post.excerpt}</p>
                 <div className="tag-row">
                   <span>{post.authorName}</span>

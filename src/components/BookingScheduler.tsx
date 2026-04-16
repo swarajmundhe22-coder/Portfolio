@@ -254,6 +254,13 @@ const BookingScheduler = ({ className, visualRegressionMode = false }: BookingSc
       name: name.trim(),
       email: email.trim(),
       message: `${summary}\n\n${messageText.trim()}`,
+      source: 'booking',
+      booking: {
+        summary,
+        selectedDateIso,
+        selectedTime,
+        timezone,
+      },
     };
 
     try {
