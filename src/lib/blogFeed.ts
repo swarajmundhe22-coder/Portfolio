@@ -1,4 +1,5 @@
 import { blogPosts } from '../data/portfolioData';
+import { buildBlogCoverSet, resolveBlogCover } from './blogCovers';
 
 export interface RawBlogPost {
   slug?: string;
@@ -21,7 +22,6 @@ export interface BlogPostModel {
   authorName: string;
 }
 
-const fallbackImage = '/project-2.jpg';
 const maxBlogPosts = 8;
 
 const normalizeSlug = (value: string): string =>
@@ -80,7 +80,7 @@ export const normalizeBlogPosts = (rows: RawBlogPost[]): BlogPostModel[] =>
     .map((row, index) => {
       const title = row.title?.trim() || `Untitled Post ${index + 1}`;
       const slug = normalizeSlug(row.slug?.trim() || title || `post-${index + 1}`) || `post-${index + 1}`;
-      const featuredImageUrl = row.featuredImageUrl?.trim() || fallbackImage;
+      const featuredImageUrl = row.featuredImageUrl?.trim() || resolveBlogCover(slug, title, index);
 
       return {
         slug,
@@ -88,7 +88,7 @@ export const normalizeBlogPosts = (rows: RawBlogPost[]): BlogPostModel[] =>
         excerpt: ensureExcerpt(row.excerpt || ''),
         content: ensureContent(row.content, row.excerpt || ''),
         featuredImageUrl,
-        featuredImageSet: `${featuredImageUrl}?w=480 1x, ${featuredImageUrl}?w=960 2x`,
+        featuredImageSet: buildBlogCoverSet(featuredImageUrl),
         publishDateIso: ensureIso(row.publishDateIso || ''),
         authorName: row.authorName?.trim() || 'Unknown Author',
       };
@@ -134,17 +134,18 @@ const countWords = (content: string[]): number =>
 
 const curatedFallbackPosts: RenderedBlogPost[] = blogPosts
   .map((post, index) => {
-    const featuredImageUrl = `/project-${(index % 4) + 1}.jpg`;
+    const slug = normalizeSlug(post.title);
+    const featuredImageUrl = resolveBlogCover(slug, post.title, index);
     const publishDateIso = ensureIso(post.date);
     const content = ensureContent(post.content, post.excerpt);
 
     return {
-      slug: normalizeSlug(post.title),
+      slug,
       title: post.title,
       excerpt: ensureExcerpt(post.excerpt),
       content,
       featuredImageUrl,
-      featuredImageSet: `${featuredImageUrl} 1x, ${featuredImageUrl} 2x`,
+      featuredImageSet: buildBlogCoverSet(featuredImageUrl),
       publishDateIso,
       publishDateLabel: toLocaleDate(publishDateIso),
       readTimeLabel: extractReadingTime(post.excerpt, content),

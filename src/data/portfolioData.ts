@@ -23,7 +23,10 @@ export interface TimelineEntry {
   period: string;
   title: string;
   org: string;
+  summary: string;
+  focus: string[];
   bullets: string[];
+  result: string;
   tags: string[];
 }
 
@@ -138,33 +141,42 @@ export const timelineEntries: TimelineEntry[] = [
     period: "APR 2026 - CURRENT",
     title: "Founder & Product Engineer",
     org: "On-Lookers",
+    summary: "Silent Decay is built to turn early decay signals into decisions teams can act on before failures surface.",
+    focus: ["Predictive intelligence", "Industrial deployment", "Decision support"],
     bullets: [
-      "Pioneered 'Silent Decay,' a next-generation predictive intelligence engine forecasting critical infrastructure deterioration before catastrophic failures occurs.",
-      "Architected a robust computational core marrying electrochemical analysis with immersive 3D hazard visualization, aggressively disrupting traditional reactive maintenance.",
-      "Spearheaded pilot deployments across marine and industrial sectors, accelerating mitigation planning by 42% and mathematically proving a massive 2.4x ROI for early adopters.",
+      "Built the product around early-warning detection for critical infrastructure deterioration.",
+      "Shaped the workflow around electrochemical analysis and 3D risk visualization.",
+      "Supported pilot deployments across marine and industrial use cases with clearer planning for early users.",
     ],
+    result: "Result: fewer guesswork-heavy maintenance calls and a clearer path from signal to action.",
     tags: ["React", "TypeScript", "Playwright", "Framer Motion"],
   },
   {
     period: "JAN 2026 - MAR 2026",
     title: "Frontend & Automation Engineer",
     org: "Independent Projects",
+    summary: "I treated the interface and the release pipeline as one system so shipping stayed fast and predictable.",
+    focus: ["Frontend delivery", "Release automation", "Accessibility"],
     bullets: [
-      "Engineered lightning-fast, serverless architectures powered by Supabase, enabling real-time profile data ingestion and zero-latency performance.",
-      "Constructed bulletproof CI/CD pipelines via GitHub Actions, systematically obliterating UI regressions and design drift across all production pull requests.",
-      "Enforced rigorous accessibility (WCAG) protocols, guaranteeing flawless multi-device responsiveness and an uncompromised, buttery-smooth user experience.",
+      "Built serverless frontends with Supabase for fast profile data handling and simple deployment.",
+      "Set up GitHub Actions workflows to catch UI regressions before release.",
+      "Kept accessibility and responsiveness consistent across devices.",
     ],
+    result: "Result: less manual QA and a more reliable interface across deploys.",
     tags: ["Supabase", "API Routes", "GitHub Actions", "WCAG"],
   },
   {
     period: "2025",
     title: "Open Source Contributor",
     org: "GitHub",
+    summary: "Small fixes here had outsized value because they removed friction for many contributors and users.",
+    focus: ["UI fixes", "Workflow speed", "Maintainability"],
     bullets: [
-      "Architected high-impact UI enhancements and resolved complex architectural bugs across top-tier JavaScript and TypeScript open-source ecosystems.",
-      "Overhauled sluggish developer workflows by establishing lightning-quick, reproducible testing environments—dramatically slashing pull request friction.",
-      "Championed maintainability and elite developer-experience (DX), leaving a permanent performance mark on repositories utilized by thousands of engineers globally.",
+      "Contributed UI improvements and fixed architectural issues across JavaScript and TypeScript projects.",
+      "Improved developer workflows with reproducible test environments and quicker feedback loops.",
+      "Kept the codebase easier to maintain for the next contributor.",
     ],
+    result: "Result: cleaner handoffs, less friction, and code that stays easier to trust.",
     tags: ["Open Source", "JavaScript", "TypeScript", "DX"],
   },
 ];
@@ -466,29 +478,19 @@ export const blogPosts: BlogPost[] = [
 
 export const socialHandles: SocialHandle[] = [
   {
-    label: "GitHub Profile",
-    href: "https://github.com/Sartahkakaedar",
+    label: "LinkedIn",
+    href: "https://www.linkedin.com/in/swaraj-mundhe-0a145b393?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app",
+    description: "Professional updates and partnership announcements",
+  },
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/vvxxvi_15?igsh=MXZnNjd4emRjeDFyOQ==",
+    description: "Visual product stories and behind-the-scenes moments",
+  },
+  {
+    label: "GitHub",
+    href: "https://github.com/swarajmundhe22-coder",
     description: "Source profile and contribution history",
-  },
-  {
-    label: "Main Repository",
-    href: "https://github.com/Sartahkakaedar/On-Lookers-Founder-Portfolio-",
-    description: "Portfolio source code",
-  },
-  {
-    label: "Design System (Storybook)",
-    href: "https://portfolio-storybook.vercel.app",
-    description: "Interactive component library & design tokens",
-  },
-  {
-    label: "Open Issues",
-    href: "https://github.com/Sartahkakaedar/On-Lookers-Founder-Portfolio-/issues",
-    description: "Tracked tasks and fixes",
-  },
-  {
-    label: "Email",
-    href: "mailto:swarajmundhe22@gmail.com",
-    description: "Direct contact",
   },
 ];
 
@@ -537,11 +539,11 @@ export const footerGroups: FooterGroup[] = [
     links: [
       {
         label: "Privacy Policy",
-        href: "https://github.com/Sartahkakaedar/On-Lookers-Founder-Portfolio-/blob/main/README.md",
+        href: "/privacy#privacy-policy",
       },
       {
         label: "Terms & Conditions",
-        href: "https://github.com/Sartahkakaedar/On-Lookers-Founder-Portfolio-/blob/main/README.md",
+        href: "/privacy",
       },
     ],
   },

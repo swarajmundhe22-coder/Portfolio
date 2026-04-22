@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, ClipboardCheck, Gauge, Users } from 'lucide-re
 import { motion } from 'framer-motion';
 import { Link, useParams } from 'react-router-dom';
 import { blogPosts } from '../data/portfolioData';
+import { buildBlogCoverSet, resolveBlogCover } from '../lib/blogCovers';
 import { fetchBlogPosts, type RenderedBlogPost } from '../lib/blogFeed';
 
 const cinematicEase = [0.16, 1, 0.3, 1] as [number, number, number, number];
@@ -45,6 +46,42 @@ interface BlogToolkit {
   scorecardMetrics: ScorecardMetric[];
 }
 
+interface SimulationDriver {
+  id: string;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+  defaultValue: number;
+  favorable: 'higher' | 'lower';
+}
+
+interface SimulationOutcome {
+  id: string;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  baseline: number;
+  sensitivity: number;
+  direction: 'higher' | 'lower';
+  driverWeights: Record<string, number>;
+}
+
+interface SimulationProfile {
+  title: string;
+  description: string;
+  drivers: SimulationDriver[];
+  outcomes: SimulationOutcome[];
+}
+
+interface SimulationOutcomeSnapshot extends SimulationOutcome {
+  value: number;
+  delta: number;
+  health: number;
+}
+
 const toSlug = (value: string): string =>
   value
     .trim()
@@ -54,16 +91,17 @@ const toSlug = (value: string): string =>
     .replace(/-+/g, '-');
 
 const staticFallbackPosts: RenderedBlogPost[] = blogPosts.map((post, index) => {
-  const imageNumber = (index % 4) + 1;
+  const slug = toSlug(post.title);
+  const featuredImageUrl = resolveBlogCover(slug, post.title, index);
   const publishDateIso = new Date(post.date).toISOString();
 
   return {
-    slug: toSlug(post.title),
+    slug,
     title: post.title,
     excerpt: post.excerpt,
     content: post.content,
-    featuredImageUrl: `/project-${imageNumber}.jpg`,
-    featuredImageSet: `/project-${imageNumber}.jpg 1x, /project-${imageNumber}.jpg 2x`,
+    featuredImageUrl,
+    featuredImageSet: buildBlogCoverSet(featuredImageUrl),
     publishDateIso,
     publishDateLabel: post.date,
     readTimeLabel: post.readTime,
@@ -994,6 +1032,270 @@ const resolvePlaybook = (article: RenderedBlogPost): BlogPlaybook =>
 const resolveToolkit = (article: RenderedBlogPost): BlogToolkit =>
   curatedToolkits[article.slug] ?? curatedToolkits[normalizeSlug(article.title)] ?? buildFallbackToolkit(article);
 
+const simulationProfiles: Record<string, SimulationProfile> = {
+  infrastructure: {
+    title: 'Infrastructure Confidence Simulator',
+    description: 'Model production pressure and watch how confidence, alerting, and operator trust move together.',
+    drivers: [
+      { id: 'sensorFreshness', label: 'Sensor freshness', unit: '%', min: 55, max: 100, step: 1, defaultValue: 86, favorable: 'higher' },
+      { id: 'ingestionLatency', label: 'Ingestion latency', unit: 'ms', min: 120, max: 2200, step: 20, defaultValue: 460, favorable: 'lower' },
+      { id: 'operatorDrillReadiness', label: 'Operator drill readiness', unit: '%', min: 40, max: 100, step: 1, defaultValue: 78, favorable: 'higher' },
+      { id: 'modelDrift', label: 'Model drift window', unit: '%', min: 2, max: 40, step: 1, defaultValue: 14, favorable: 'lower' },
+    ],
+    outcomes: [
+      {
+        id: 'forecastConfidence',
+        label: 'Forecast confidence',
+        unit: '%',
+        min: 45,
+        max: 99,
+        baseline: 78,
+        sensitivity: 18,
+        direction: 'higher',
+        driverWeights: { sensorFreshness: 0.38, ingestionLatency: 0.2, operatorDrillReadiness: 0.24, modelDrift: 0.18 },
+      },
+      {
+        id: 'falseAlertRate',
+        label: 'False alert rate',
+        unit: '%',
+        min: 1,
+        max: 34,
+        baseline: 12,
+        sensitivity: 14,
+        direction: 'lower',
+        driverWeights: { sensorFreshness: 0.16, ingestionLatency: 0.25, operatorDrillReadiness: 0.14, modelDrift: 0.45 },
+      },
+      {
+        id: 'mitigationLeadTime',
+        label: 'Mitigation lead time',
+        unit: 'h',
+        min: 1,
+        max: 22,
+        baseline: 8,
+        sensitivity: 8,
+        direction: 'higher',
+        driverWeights: { sensorFreshness: 0.26, ingestionLatency: 0.24, operatorDrillReadiness: 0.34, modelDrift: 0.16 },
+      },
+    ],
+  },
+  visualDelivery: {
+    title: 'Visual Delivery Simulator',
+    description: 'Stress your pipeline with real delivery conditions instead of static quality scores.',
+    drivers: [
+      { id: 'ciCoverage', label: 'CI route coverage', unit: '%', min: 25, max: 100, step: 1, defaultValue: 72, favorable: 'higher' },
+      { id: 'baselineDiscipline', label: 'Baseline discipline', unit: '%', min: 20, max: 100, step: 1, defaultValue: 70, favorable: 'higher' },
+      { id: 'releaseVelocity', label: 'Release velocity', unit: 'deploy/wk', min: 1, max: 20, step: 1, defaultValue: 8, favorable: 'lower' },
+      { id: 'designTokenDrift', label: 'Token drift incidents', unit: '/wk', min: 0, max: 12, step: 1, defaultValue: 3, favorable: 'lower' },
+    ],
+    outcomes: [
+      {
+        id: 'visualPassRate',
+        label: 'Visual check pass rate',
+        unit: '%',
+        min: 52,
+        max: 99,
+        baseline: 82,
+        sensitivity: 16,
+        direction: 'higher',
+        driverWeights: { ciCoverage: 0.36, baselineDiscipline: 0.3, releaseVelocity: 0.18, designTokenDrift: 0.16 },
+      },
+      {
+        id: 'postReleaseRegressions',
+        label: 'Post-release regressions',
+        unit: '/mo',
+        min: 0,
+        max: 18,
+        baseline: 6,
+        sensitivity: 7,
+        direction: 'lower',
+        driverWeights: { ciCoverage: 0.28, baselineDiscipline: 0.27, releaseVelocity: 0.17, designTokenDrift: 0.28 },
+      },
+      {
+        id: 'reviewCycleTime',
+        label: 'PR visual review time',
+        unit: 'h',
+        min: 0.6,
+        max: 26,
+        baseline: 9,
+        sensitivity: 8,
+        direction: 'lower',
+        driverWeights: { ciCoverage: 0.22, baselineDiscipline: 0.34, releaseVelocity: 0.28, designTokenDrift: 0.16 },
+      },
+    ],
+  },
+  contactPipeline: {
+    title: 'Lead Funnel Reliability Simulator',
+    description: 'Tune validation and abuse controls to see reliability and conversion impact in real time.',
+    drivers: [
+      { id: 'validationCoverage', label: 'Validation coverage', unit: '%', min: 30, max: 100, step: 1, defaultValue: 79, favorable: 'higher' },
+      { id: 'spamPressure', label: 'Spam pressure', unit: 'req/h', min: 0, max: 550, step: 10, defaultValue: 160, favorable: 'lower' },
+      { id: 'schemaChangeRate', label: 'Schema changes', unit: '/mo', min: 0, max: 14, step: 1, defaultValue: 4, favorable: 'lower' },
+      { id: 'alertLatency', label: 'Alert latency', unit: 'min', min: 1, max: 75, step: 1, defaultValue: 14, favorable: 'lower' },
+    ],
+    outcomes: [
+      {
+        id: 'submissionSuccess',
+        label: 'Submission success rate',
+        unit: '%',
+        min: 48,
+        max: 99,
+        baseline: 84,
+        sensitivity: 17,
+        direction: 'higher',
+        driverWeights: { validationCoverage: 0.44, spamPressure: 0.22, schemaChangeRate: 0.16, alertLatency: 0.18 },
+      },
+      {
+        id: 'duplicateOrFraud',
+        label: 'Fraud and duplicates',
+        unit: '%',
+        min: 0,
+        max: 27,
+        baseline: 9,
+        sensitivity: 10,
+        direction: 'lower',
+        driverWeights: { validationCoverage: 0.24, spamPressure: 0.44, schemaChangeRate: 0.12, alertLatency: 0.2 },
+      },
+      {
+        id: 'recoveryTime',
+        label: 'Recovery time after failure',
+        unit: 'min',
+        min: 4,
+        max: 130,
+        baseline: 38,
+        sensitivity: 32,
+        direction: 'lower',
+        driverWeights: { validationCoverage: 0.2, spamPressure: 0.18, schemaChangeRate: 0.24, alertLatency: 0.38 },
+      },
+    ],
+  },
+  motionPerformance: {
+    title: 'Motion Quality Simulator',
+    description: 'Balance cinematic quality and responsiveness with real device constraints.',
+    drivers: [
+      { id: 'animationDensity', label: 'Concurrent animated layers', unit: 'layers', min: 2, max: 24, step: 1, defaultValue: 11, favorable: 'lower' },
+      { id: 'gpuBudget', label: 'GPU budget fit', unit: '%', min: 25, max: 100, step: 1, defaultValue: 73, favorable: 'higher' },
+      { id: 'interactionLatency', label: 'Interaction latency', unit: 'ms', min: 25, max: 480, step: 5, defaultValue: 140, favorable: 'lower' },
+      { id: 'reducedMotionCoverage', label: 'Reduced-motion coverage', unit: '%', min: 0, max: 100, step: 1, defaultValue: 68, favorable: 'higher' },
+    ],
+    outcomes: [
+      {
+        id: 'fpsStability',
+        label: 'Frame-time stability',
+        unit: '%',
+        min: 40,
+        max: 99,
+        baseline: 78,
+        sensitivity: 18,
+        direction: 'higher',
+        driverWeights: { animationDensity: 0.34, gpuBudget: 0.31, interactionLatency: 0.23, reducedMotionCoverage: 0.12 },
+      },
+      {
+        id: 'inputResponsiveness',
+        label: 'Input responsiveness',
+        unit: '%',
+        min: 35,
+        max: 99,
+        baseline: 74,
+        sensitivity: 18,
+        direction: 'higher',
+        driverWeights: { animationDensity: 0.18, gpuBudget: 0.22, interactionLatency: 0.46, reducedMotionCoverage: 0.14 },
+      },
+      {
+        id: 'motionDefectRate',
+        label: 'Motion defects',
+        unit: '/mo',
+        min: 0,
+        max: 20,
+        baseline: 6,
+        sensitivity: 7,
+        direction: 'lower',
+        driverWeights: { animationDensity: 0.24, gpuBudget: 0.22, interactionLatency: 0.36, reducedMotionCoverage: 0.18 },
+      },
+    ],
+  },
+  accessibility: {
+    title: 'Accessibility Compliance Simulator',
+    description: 'Track how token quality and release pressure impact real accessibility reliability.',
+    drivers: [
+      { id: 'tokenCoverage', label: 'Semantic token coverage', unit: '%', min: 20, max: 100, step: 1, defaultValue: 74, favorable: 'higher' },
+      { id: 'stateAuditCoverage', label: 'State audit coverage', unit: '%', min: 10, max: 100, step: 1, defaultValue: 66, favorable: 'higher' },
+      { id: 'themeComplexity', label: 'Theme variants in release', unit: 'count', min: 1, max: 16, step: 1, defaultValue: 5, favorable: 'lower' },
+      { id: 'contentVariance', label: 'Content variance risk', unit: '%', min: 0, max: 100, step: 1, defaultValue: 36, favorable: 'lower' },
+    ],
+    outcomes: [
+      {
+        id: 'wcagPassRate',
+        label: 'WCAG pass rate',
+        unit: '%',
+        min: 44,
+        max: 99,
+        baseline: 79,
+        sensitivity: 16,
+        direction: 'higher',
+        driverWeights: { tokenCoverage: 0.32, stateAuditCoverage: 0.34, themeComplexity: 0.16, contentVariance: 0.18 },
+      },
+      {
+        id: 'contrastIncidents',
+        label: 'Contrast incidents',
+        unit: '/mo',
+        min: 0,
+        max: 16,
+        baseline: 5,
+        sensitivity: 6,
+        direction: 'lower',
+        driverWeights: { tokenCoverage: 0.24, stateAuditCoverage: 0.31, themeComplexity: 0.22, contentVariance: 0.23 },
+      },
+      {
+        id: 'remediationCycle',
+        label: 'Remediation cycle',
+        unit: 'days',
+        min: 0.5,
+        max: 16,
+        baseline: 5.2,
+        sensitivity: 4.2,
+        direction: 'lower',
+        driverWeights: { tokenCoverage: 0.2, stateAuditCoverage: 0.36, themeComplexity: 0.22, contentVariance: 0.22 },
+      },
+    ],
+  },
+};
+
+const simulationProfileBySlug: Record<string, keyof typeof simulationProfiles> = {
+  'why-react-threejs-real-time-simulation-for-infrastructure-intelligence': 'infrastructure',
+  'frame-matching-a-portfolio-from-video-only': 'motionPerformance',
+  'design-drift-is-a-ci-problem-not-a-qa-problem': 'visualDelivery',
+  'design-drift-is-a-ci-problem': 'visualDelivery',
+  'building-reliable-contact-pipelines-with-supabase': 'contactPipeline',
+  'motion-values-that-feel-premium-at-60-fps': 'motionPerformance',
+  'responsive-qa-checklist-for-320-to-1440-widths': 'visualDelivery',
+  'accessibility-contrast-audits-without-guesswork': 'accessibility',
+  'debugging-frontend-incidents-before-users-notice': 'visualDelivery',
+};
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+const toDriverFavorableRatio = (driver: SimulationDriver, value: number): number => {
+  const bounded = clamp(value, driver.min, driver.max);
+  const span = Math.max(1e-6, driver.max - driver.min);
+  const normalized = (bounded - driver.min) / span;
+  return driver.favorable === 'higher' ? normalized : 1 - normalized;
+};
+
+const toOutcomeHealthRatio = (outcome: SimulationOutcomeSnapshot): number => {
+  const span = Math.max(1e-6, outcome.max - outcome.min);
+  const normalized = (outcome.value - outcome.min) / span;
+  return outcome.direction === 'higher' ? normalized : 1 - normalized;
+};
+
+const resolveSimulationProfile = (article: RenderedBlogPost): SimulationProfile => {
+  const profileKey =
+    simulationProfileBySlug[article.slug] ??
+    simulationProfileBySlug[normalizeSlug(article.title)] ??
+    'visualDelivery';
+
+  return simulationProfiles[profileKey];
+};
+
 const clampScore = (value: number): number => Math.min(5, Math.max(0, value));
 
 const resolveScoreBand = (score: number): string => {
@@ -1013,7 +1315,7 @@ const BlogArticlePage = () => {
   const [posts, setPosts] = useState<RenderedBlogPost[]>(staticFallbackPosts);
   const [loading, setLoading] = useState(true);
   const [completedChecks, setCompletedChecks] = useState<Record<string, boolean>>({});
-  const [scoreInputs, setScoreInputs] = useState<Record<string, number>>({});
+  const [simulationInputs, setSimulationInputs] = useState<Record<string, number>>({});
   const [copyFeedback, setCopyFeedback] = useState('');
 
   const normalizedSlug = normalizeSlug(slug);
@@ -1060,24 +1362,29 @@ const BlogArticlePage = () => {
     [article],
   );
 
+  const simulationProfile = useMemo(
+    () => (article ? resolveSimulationProfile(article) : null),
+    [article],
+  );
+
   useEffect(() => {
     setCompletedChecks({});
-    setScoreInputs({});
+    setSimulationInputs({});
     setCopyFeedback('');
   }, [article?.slug]);
 
   useEffect(() => {
-    if (!article || !toolkit) {
+    if (!article || !simulationProfile) {
       return;
     }
 
-    const initialScores = toolkit.scorecardMetrics.reduce<Record<string, number>>((accumulator, metric) => {
-      accumulator[`${article.slug}-${metric.id}`] = 3;
+    const defaults = simulationProfile.drivers.reduce<Record<string, number>>((accumulator, driver) => {
+      accumulator[`${article.slug}-${driver.id}`] = driver.defaultValue;
       return accumulator;
     }, {});
 
-    setScoreInputs(initialScores);
-  }, [article, toolkit]);
+    setSimulationInputs(defaults);
+  }, [article, simulationProfile]);
 
   useEffect(() => {
     if (!copyFeedback) {
@@ -1099,8 +1406,61 @@ const BlogArticlePage = () => {
     }, 0);
   }, [article, completedChecks, playbook]);
 
+  const simulationResult = useMemo(() => {
+    if (!article || !toolkit || !simulationProfile) {
+      return null;
+    }
+
+    const driverRatios = simulationProfile.drivers.reduce<Record<string, number>>((accumulator, driver) => {
+      const key = `${article.slug}-${driver.id}`;
+      const currentValue = simulationInputs[key] ?? driver.defaultValue;
+      accumulator[driver.id] = toDriverFavorableRatio(driver, currentValue);
+      return accumulator;
+    }, {});
+
+    const outcomes = simulationProfile.outcomes.map<SimulationOutcomeSnapshot>((outcome) => {
+      const weightedDelta = Object.entries(outcome.driverWeights).reduce((total, [driverId, weight]) => {
+        const ratio = driverRatios[driverId] ?? 0.5;
+        return total + (ratio - 0.5) * 2 * weight;
+      }, 0);
+
+      const value = clamp(
+        outcome.baseline + weightedDelta * outcome.sensitivity,
+        outcome.min,
+        outcome.max,
+      );
+
+      return {
+        ...outcome,
+        value,
+        delta: value - outcome.baseline,
+        health: toOutcomeHealthRatio({ ...outcome, value, delta: value - outcome.baseline, health: 0 }),
+      };
+    });
+
+    const metricScores = toolkit.scorecardMetrics.reduce<Record<string, number>>((accumulator, metric, index) => {
+      const mappedOutcome = outcomes[index % outcomes.length];
+      accumulator[metric.id] = clampScore(Number((mappedOutcome.health * 5).toFixed(1)));
+      return accumulator;
+    }, {});
+
+    return {
+      outcomes,
+      metricScores,
+      readiness: Math.round(
+        outcomes.reduce((total, outcome) => total + outcome.health, 0) /
+          Math.max(1, outcomes.length) *
+          100,
+      ),
+    };
+  }, [article, toolkit, simulationProfile, simulationInputs]);
+
   const scoreSummary = useMemo(() => {
-    if (!article || !toolkit || toolkit.scorecardMetrics.length === 0) {
+    if (!toolkit || toolkit.scorecardMetrics.length === 0) {
+      return { percent: 0, label: 'Unavailable' };
+    }
+
+    if (!simulationResult) {
       return { percent: 0, label: 'Unavailable' };
     }
 
@@ -1108,15 +1468,14 @@ const BlogArticlePage = () => {
     let maxTotal = 0;
 
     toolkit.scorecardMetrics.forEach((metric) => {
-      const key = `${article.slug}-${metric.id}`;
-      const value = clampScore(scoreInputs[key] ?? 3);
+      const value = clampScore(simulationResult.metricScores[metric.id] ?? 3);
       weightedTotal += value * metric.weight;
       maxTotal += 5 * metric.weight;
     });
 
     const percent = maxTotal > 0 ? Math.round((weightedTotal / maxTotal) * 100) : 0;
     return { percent, label: resolveScoreBand(percent) };
-  }, [article, toolkit, scoreInputs]);
+  }, [simulationResult, toolkit]);
 
   const toggleChecklistItem = (index: number): void => {
     if (!article) {
@@ -1130,15 +1489,15 @@ const BlogArticlePage = () => {
     }));
   };
 
-  const updateScoreMetric = (metricId: string, nextValue: number): void => {
+  const updateSimulationInput = (driverId: string, nextValue: number): void => {
     if (!article) {
       return;
     }
 
-    const key = `${article.slug}-${metricId}`;
-    setScoreInputs((current) => ({
+    const key = `${article.slug}-${driverId}`;
+    setSimulationInputs((current) => ({
       ...current,
-      [key]: clampScore(nextValue),
+      [key]: nextValue,
     }));
   };
 
@@ -1195,8 +1554,7 @@ const BlogArticlePage = () => {
 
     const scorecardLines = toolkit.scorecardMetrics
       .map((metric) => {
-        const key = `${article.slug}-${metric.id}`;
-        const currentValue = clampScore(scoreInputs[key] ?? 3);
+        const currentValue = clampScore(simulationResult?.metricScores[metric.id] ?? 3);
         return `- ${metric.label}: ${currentValue}/5 (${metric.prompt})`;
       })
       .join('\n');
@@ -1358,32 +1716,72 @@ const BlogArticlePage = () => {
                     <h3>
                       <Gauge size={14} /> {toolkit.calculatorTitle}
                     </h3>
-                    <p className="blog-scorecard-help">{toolkit.calculatorPrompt}</p>
-                    <div className="blog-scorecard-list">
-                      {toolkit.scorecardMetrics.map((metric) => {
-                        const key = `${article.slug}-${metric.id}`;
-                        const score = clampScore(scoreInputs[key] ?? 3);
+                    <p className="blog-scorecard-help">
+                      {simulationProfile?.description ?? toolkit.calculatorPrompt}
+                    </p>
+                    {simulationProfile && simulationResult ? (
+                      <>
+                        <p className="blog-simulator-title">{simulationProfile.title}</p>
+                        <div className="blog-simulation-controls">
+                          {simulationProfile.drivers.map((driver) => {
+                            const key = `${article.slug}-${driver.id}`;
+                            const currentValue = simulationInputs[key] ?? driver.defaultValue;
 
-                        return (
-                          <label key={`${article.slug}-score-${metric.id}`} className="blog-scorecard-row">
-                            <span className="blog-scorecard-label">{metric.label}</span>
-                            <input
-                              type="range"
-                              min={0}
-                              max={5}
-                              step={1}
-                              value={score}
-                              onChange={(event) => updateScoreMetric(metric.id, Number(event.target.value))}
-                              aria-label={`${metric.label} readiness score`}
-                            />
-                            <div className="blog-scorecard-meta">
-                              <small>{metric.prompt}</small>
-                              <strong>{score}/5</strong>
-                            </div>
-                          </label>
-                        );
-                      })}
-                    </div>
+                            return (
+                              <label key={`${article.slug}-driver-${driver.id}`} className="blog-scorecard-row">
+                                <span className="blog-scorecard-label">{driver.label}</span>
+                                <input
+                                  type="range"
+                                  min={driver.min}
+                                  max={driver.max}
+                                  step={driver.step}
+                                  value={currentValue}
+                                  onChange={(event) =>
+                                    updateSimulationInput(driver.id, Number(event.target.value))
+                                  }
+                                  aria-label={`${driver.label} simulation control`}
+                                />
+                                <div className="blog-scorecard-meta">
+                                  <small>
+                                    Range {driver.min}-{driver.max} {driver.unit} ({driver.favorable} is better)
+                                  </small>
+                                  <strong>
+                                    {Number(currentValue.toFixed(1))}
+                                    {driver.unit}
+                                  </strong>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        <div className="blog-simulation-outcomes" aria-live="polite">
+                          {simulationResult.outcomes.map((outcome) => {
+                            const delta = Number(outcome.delta.toFixed(1));
+                            const improving = outcome.direction === 'higher' ? delta >= 0 : delta <= 0;
+
+                            return (
+                              <article
+                                key={`${article.slug}-outcome-${outcome.id}`}
+                                className={`blog-simulation-tile ${improving ? 'is-positive' : 'is-negative'}`}
+                              >
+                                <p>{outcome.label}</p>
+                                <strong>
+                                  {Number(outcome.value.toFixed(1))}
+                                  {outcome.unit}
+                                </strong>
+                                <span>
+                                  {improving ? 'Improving' : 'Regressing'} vs baseline{' '}
+                                  {delta > 0 ? '+' : ''}
+                                  {delta}
+                                  {outcome.unit}
+                                </span>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </>
+                    ) : null}
                     <p className="blog-scorecard-total">Readiness score: {scoreSummary.percent}% ({scoreSummary.label})</p>
                   </article>
 

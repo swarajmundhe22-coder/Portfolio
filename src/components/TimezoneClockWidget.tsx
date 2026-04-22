@@ -310,9 +310,12 @@ const TimezoneClockWidget = ({ className, visualRegressionMode }: TimezoneClockW
             >
               <motion.div
                 className="tab-bg"
-                animate={isActive ? { opacity: 1 } : { opacity: 0.5 }}
+                animate={isActive ? { opacity: 0 } : { opacity: 0 }}
                 transition={{ duration: 0.3 }}
-                style={{ background: isActive ? zPhase.bgGradient : 'rgba(12, 15, 22, 0.6)' }}
+                style={{ 
+                  background: 'rgba(12, 15, 22, 0.6)',
+                  boxShadow: 'none'
+                }}
               />
 
               <div className="tab-inner">
@@ -342,7 +345,6 @@ const TimezoneClockWidget = ({ className, visualRegressionMode }: TimezoneClockW
                 <motion.div
                   className="active-indicator"
                   layoutId="tab-active"
-                  style={{ background: zPhase.accentColor }}
                   transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                 />
               )}

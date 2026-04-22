@@ -4,6 +4,7 @@ import { ArrowUpRight, CalendarDays } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { blogPosts } from '../data/portfolioData';
 import CinematicImage from './CinematicImage';
+import { buildBlogCoverSet, resolveBlogCover } from '../lib/blogCovers';
 import { fetchBlogPosts, type RenderedBlogPost } from '../lib/blogFeed';
 
 interface DynamicBlogCardsProps {
@@ -38,16 +39,17 @@ const resolveAudienceLabel = (post: RenderedBlogPost): string =>
   'Product and engineering teams';
 
 const staticFallbackPosts: RenderedBlogPost[] = blogPosts.map((post, index) => {
-  const imageNumber = (index % 4) + 1;
+  const slug = toSlug(post.title);
+  const featuredImageUrl = resolveBlogCover(slug, post.title, index);
   const publishDateIso = new Date(post.date).toISOString();
 
   return {
-    slug: toSlug(post.title),
+    slug,
     title: post.title,
     excerpt: post.excerpt,
     content: post.content,
-    featuredImageUrl: `/project-${imageNumber}.jpg`,
-    featuredImageSet: `/project-${imageNumber}.jpg 1x, /project-${imageNumber}.jpg 2x`,
+    featuredImageUrl,
+    featuredImageSet: buildBlogCoverSet(featuredImageUrl),
     publishDateIso,
     publishDateLabel: post.date,
     readTimeLabel: post.readTime,

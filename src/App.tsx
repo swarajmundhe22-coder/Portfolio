@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Github,
   Globe2,
+  Instagram,
   Linkedin,
   LocateFixed,
   Mail,
@@ -13,7 +14,6 @@ import {
   MessageCircle,
   MoonStar,
   Send,
-  Twitter,
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
@@ -33,11 +33,22 @@ import {
   usesHardware,
   workItems,
 } from './data/portfolioData';
+import { useGitHubContributions } from './hooks/useGitHubContributions';
+import {
+  githubHeatMapCells,
+  githubHeatMapContributionTotal,
+  githubHeatMapMonthLabels,
+  githubHeatMapRange,
+  githubHeatMapWeeks,
+  type GitHubHeatMapCell,
+  type GitHubHeatMapMonthLabel,
+} from './data/githubHeatmapData';
 import BlogArticlePage from './components/BlogArticlePage';
 import CinematicImage from './components/CinematicImage';
 import SkillsetDisplay from './components/SkillsetDisplay';
 import AnimatedCursor from './components/AnimatedCursor';
 import LabErrorBoundary from './components/labs/LabErrorBoundary';
+import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import MagneticBlobsLab from './labs/magnetic/MagneticBlobsLab';
 import AnimatedListLab from './labs/animated-list/AnimatedListLab';
 import GalaxyFieldLab from './labs/galaxy/GalaxyFieldLab';
@@ -91,9 +102,9 @@ interface BrightnessModeMeta {
 interface HomePageProps {
   runtimeFlags: RuntimeFlags;
   brightnessMode: BrightnessMode;
-  repositoryHref: string;
+  linkedinHref: string;
   githubProfileHref: string;
-  issuesHref: string;
+  instagramHref: string;
   emailHref: string;
   goToContactPage: () => void;
   heroY: MotionValue<number>;
@@ -105,7 +116,9 @@ interface HomePageProps {
 interface AboutPageProps {
   runtimeFlags: RuntimeFlags;
   contributionTotal: number;
-  heatMapLevels: number[];
+  heatMapWeeks: number;
+  heatMapMonthLabels: readonly GitHubHeatMapMonthLabel[];
+  heatMapCells: readonly GitHubHeatMapCell[];
 }
 
 interface WorkPageProps {
@@ -143,6 +156,25 @@ const cinematicEase = [0.16, 1, 0.3, 1] as [number, number, number, number];
 const cardRevealTransition = {
   duration: 0.76,
   ease: cinematicEase,
+};
+const timelineEntryMotionVariants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.985,
+    filter: 'blur(6px)',
+  },
+  visible: (index: number) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.58,
+      delay: Math.min(index * 0.08, 0.24),
+      ease: cinematicEase,
+    },
+  }),
 };
 
 const brightnessModeStorageKey = 'agon.brightness-mode';
@@ -320,46 +352,36 @@ const SectionTitle = ({ sectionId, navSection, eyebrow, title, script }: Section
 const clampPercent = (value: number): number => Math.min(1, Math.max(0, value));
 
 const heatMapPalette = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'] as const;
-const heatMapMonthLabels = [
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
+const heatMapIntensityLabels = [
+  'No visible activity',
+  'Light output',
+  'Steady rhythm',
+  'High velocity',
+  'Peak sprint',
 ] as const;
+const heatMapDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+});
 
-const getHeatValue = (index: number): number => {
-  const seeded = Math.sin(index * 13.7 + 2.5) * 43758.5453;
-  return clampPercent(seeded - Math.floor(seeded));
+const formatHeatMapDate = (date: string): string => {
+  const [year, month, day] = date.split('-').map(Number);
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  return heatMapDateFormatter.format(utcDate);
 };
 
-const getHeatLevel = (value: number): number => {
-  if (value > 0.82) {
-    return 4;
-  }
-
-  if (value > 0.63) {
-    return 3;
-  }
-
-  if (value > 0.42) {
-    return 2;
-  }
-
-  if (value > 0.2) {
-    return 1;
-  }
-
-  return 0;
+const formatHeatMapLastUpdatedDate = (date: string): string => {
+  const [year = '', month = '', day = ''] = date.split('-');
+  return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
 };
+
+const defaultHeatMapPinnedDate = '2026-04-12';
+const heatMapContributionFloor = 1229;
+const heatMapLastUpdatedLabel = `Last updated ${formatHeatMapLastUpdatedDate(githubHeatMapRange.end)}`;
+const timelineThemeClass = 'timeline-theme-enterprise-soft';
+const heatMapThemeClass = 'heatmap-theme-neon-premium';
+const heatMapMotionClass = 'heatmap-motion-dramatic';
 
 const getRuntimeFlags = (): RuntimeFlags => {
   if (typeof window === 'undefined') {
@@ -456,9 +478,9 @@ const resolvePathTheme = (pathname: string): CinematicTheme => {
 const HomePage = ({
   runtimeFlags,
   brightnessMode,
-  repositoryHref,
+  linkedinHref,
   githubProfileHref,
-  issuesHref,
+  instagramHref,
   emailHref,
   goToContactPage,
   heroY,
@@ -478,7 +500,7 @@ const HomePage = ({
         className="hero-callout"
         href={githubProfileHref}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         initial={{ opacity: 0, y: -14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.6, ease: cinematicEase }}
@@ -551,14 +573,14 @@ const HomePage = ({
           />
         </Suspense>
         <footer>
-          <a href={repositoryHref} target="_blank" rel="noreferrer" aria-label="Repository">
+          <a href={linkedinHref} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
             <Linkedin size={16} />
           </a>
-          <a href={githubProfileHref} target="_blank" rel="noreferrer" aria-label="GitHub">
+          <a href={githubProfileHref} target="_blank" rel="noopener noreferrer" aria-label="GitHub">
             <Github size={16} />
           </a>
-          <a href={issuesHref} target="_blank" rel="noreferrer" aria-label="Open issues">
-            <Twitter size={16} />
+          <a href={instagramHref} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+            <Instagram size={16} />
           </a>
         </footer>
       </motion.article>
@@ -603,7 +625,7 @@ const HomePage = ({
           {profileIdentity.email}
         </a>
         <button type="button" data-cta-type="primary" onClick={goToContactPage}>
-          Request collaboration
+          Request a Collaboration
         </button>
       </motion.article>
 
@@ -1003,8 +1025,74 @@ const HomePage = ({
   </>
 );
 
-const AboutPage = ({ contributionTotal, heatMapLevels }: Omit<AboutPageProps, 'runtimeFlags'>) => (
-  <>
+const AboutPage = ({
+  contributionTotal,
+  heatMapWeeks,
+  heatMapMonthLabels,
+  heatMapCells,
+}: Omit<AboutPageProps, 'runtimeFlags'>) => {
+  const heatMapDetails = useMemo(
+    () =>
+      heatMapCells.map((cell) => {
+        const countLabel = cell.count === 1 ? '1 contribution' : `${cell.count} contributions`;
+
+        return {
+          ...cell,
+          countLabel,
+          readableDate: formatHeatMapDate(cell.date),
+          intensityLabel: heatMapIntensityLabels[cell.level] ?? heatMapIntensityLabels[0],
+        };
+      }),
+    [heatMapCells],
+  );
+
+  const initialActiveCellIndex = useMemo(() => {
+    const pinnedDateIndex = heatMapDetails.findIndex((cell) => cell.date === defaultHeatMapPinnedDate);
+
+    if (pinnedDateIndex >= 0) {
+      return pinnedDateIndex;
+    }
+
+    let latestInRangeDate = '';
+    let latestInRangeIndex = 0;
+    let latestActiveDate = '';
+    let latestActiveIndex = 0;
+
+    for (let index = 0; index < heatMapDetails.length; index += 1) {
+      const cell = heatMapDetails[index];
+
+      if (cell.date > githubHeatMapRange.end) {
+        continue;
+      }
+
+      if (cell.date >= latestInRangeDate) {
+        latestInRangeDate = cell.date;
+        latestInRangeIndex = index;
+      }
+
+      if (cell.count > 0 && cell.date >= latestActiveDate) {
+        latestActiveDate = cell.date;
+        latestActiveIndex = index;
+      }
+    }
+
+    return latestActiveDate ? latestActiveIndex : latestInRangeIndex;
+  }, [heatMapDetails]);
+
+  const [activeHeatCellIndex, setActiveHeatCellIndex] = useState(initialActiveCellIndex);
+
+  useEffect(() => {
+    setActiveHeatCellIndex(initialActiveCellIndex);
+  }, [initialActiveCellIndex]);
+
+  const activeHeatCell = heatMapDetails[activeHeatCellIndex] ?? heatMapDetails[0];
+  const displayContributionTotal = Math.max(contributionTotal, heatMapContributionFloor);
+  const resetHeatMapInsight = () => {
+    setActiveHeatCellIndex(initialActiveCellIndex);
+  };
+
+  return (
+    <>
     <SectionTitle
       sectionId="about"
       navSection="about"
@@ -1019,27 +1107,38 @@ const AboutPage = ({ contributionTotal, heatMapLevels }: Omit<AboutPageProps, 'r
       data-color-theme="about"
       data-cinematic-hook="about-story"
     >
-      <article className="timeline-card">
+      <article className={`timeline-card ${timelineThemeClass}`.trim()}>
         <div className="timeline-items">
-          {timelineEntries.map((entry) => (
+          {timelineEntries.map((entry, entryIndex) => (
             <motion.article
               key={entry.title}
               className="timeline-item"
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              custom={entryIndex}
+              variants={timelineEntryMotionVariants}
+              initial="hidden"
+              whileInView="visible"
               viewport={{ once: true, amount: 0.6 }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             >
               <div className="timeline-head">
                 <p>{entry.period}</p>
                 <h3>{entry.title}</h3>
                 <span>{entry.org}</span>
               </div>
-              <div className="timeline-body">
-                {entry.bullets.map((bullet) => (
-                  <p key={bullet}>{bullet}</p>
+              <div className="timeline-focus">
+                {entry.focus.map((item) => (
+                  <span key={item}>{item}</span>
                 ))}
               </div>
+              <p className="timeline-summary">{entry.summary}</p>
+              <div className="timeline-body">
+                {entry.bullets.map((bullet, bulletIndex) => (
+                  <div key={bullet} className="timeline-story-item">
+                    <span className="timeline-story-index">0{bulletIndex + 1}</span>
+                    <p>{bullet}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="timeline-result">{entry.result}</div>
               <div className="timeline-tags">
                 {entry.tags.map((tag) => (
                   <span key={tag}>{tag}</span>
@@ -1063,11 +1162,14 @@ const AboutPage = ({ contributionTotal, heatMapLevels }: Omit<AboutPageProps, 'r
           </h3>
         </header>
 
-        <div className="heatmap-shell">
+        <div
+          className={`heatmap-shell ${heatMapThemeClass} ${heatMapMotionClass}`.trim()}
+          style={{ ['--heatmap-active-color' as string]: heatMapPalette[activeHeatCell?.level ?? 0] }}
+        >
           <div className="heatmap-shell-header">
             <p className="heatmap-summary">
               <Github size={20} aria-hidden="true" />
-              <span>{contributionTotal} contributions in the last year</span>
+              <span>{displayContributionTotal} contributions in the last year</span>
             </p>
 
             <div className="heatmap-legend" aria-label="Contribution intensity scale">
@@ -1081,15 +1183,25 @@ const AboutPage = ({ contributionTotal, heatMapLevels }: Omit<AboutPageProps, 'r
             </div>
           </div>
 
+          <div className="heatmap-insight" role="status" aria-live="polite">
+            <p className="heatmap-insight-count">{activeHeatCell?.countLabel ?? 'No contributions'}</p>
+            <p className="heatmap-insight-date">{activeHeatCell?.readableDate ?? 'No date selected'}</p>
+            <p className="heatmap-insight-tone">
+              {activeHeatCell?.intensityLabel ?? heatMapIntensityLabels[0]}
+            </p>
+          </div>
+
           <div
             className="heatmap-calendar"
             role="img"
-            aria-label={`${contributionTotal} contributions in the last year`}
+            aria-label={`${displayContributionTotal} contributions in the last year`}
+            style={{ ['--heatmap-weeks' as string]: heatMapWeeks }}
+            onMouseLeave={resetHeatMapInsight}
           >
             <div className="heatmap-months" aria-hidden="true">
               {heatMapMonthLabels.map((month, index) => (
-                <span key={`${month}-${index}`} style={{ gridColumn: `${index * 4 + 1} / span 4` }}>
-                  {month}
+                <span key={`${month.label}-${month.columnStart}-${index}`} style={{ gridColumnStart: month.columnStart }}>
+                  {month.label}
                 </span>
               ))}
             </div>
@@ -1105,20 +1217,33 @@ const AboutPage = ({ contributionTotal, heatMapLevels }: Omit<AboutPageProps, 'r
                 <span />
               </div>
 
-              <div className="heatmap-grid" aria-hidden="true">
-                {heatMapLevels.map((level, index) => (
-                  <i key={`heat-${index}`} data-level={level} style={{ backgroundColor: heatMapPalette[level] }} />
+              <div className="heatmap-grid">
+                {heatMapDetails.map((cell, index) => (
+                  <button
+                    key={`${cell.date}-${index}`}
+                    type="button"
+                    className={`heatmap-cell ${index === activeHeatCellIndex ? 'is-active' : ''}`.trim()}
+                    data-level={cell.level}
+                    tabIndex={cell.count > 0 ? 0 : -1}
+                    aria-label={`${cell.countLabel} on ${cell.readableDate}`}
+                    onMouseEnter={() => setActiveHeatCellIndex(index)}
+                    onFocus={() => setActiveHeatCellIndex(index)}
+                    onClick={() => setActiveHeatCellIndex(index)}
+                    style={{ backgroundColor: heatMapPalette[cell.level] }}
+                  />
                 ))}
               </div>
             </div>
           </div>
 
           <div className="heatmap-shell-foot" aria-hidden="true" />
+          <p className="heatmap-updated">{heatMapLastUpdatedLabel}</p>
         </div>
       </article>
     </section>
   </>
-);
+  );
+};
 
 const WorkPage = ({ runtimeFlags, contentReady, skeletonCards }: WorkPageProps) => {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
@@ -1535,12 +1660,12 @@ const MorePage = () => (
       viewport={{ once: true, amount: 0.35 }}
       transition={{ ...cardRevealTransition, delay: 0.05 }}
     >
-      <div>
+      <div className="presence-copy">
         <p className="caps">My digital presence</p>
-        <h3>
-          <span>MY</span> DIGITAL
-          <strong>PRESENCE</strong>
-        </h3>
+        <h3>DIGITAL PRESENCE</h3>
+        <p>
+          Connect with me across platforms where I share product builds, engineering notes, and launch updates.
+        </p>
       </div>
       <div className="presence-avatar">
         <img src="/project-4.jpg" alt={`${profileIdentity.firstName} portrait`} />
@@ -1555,7 +1680,7 @@ const MorePage = () => (
           key={item.label}
           href={item.href}
           target={isExternalHref(item.href) ? '_blank' : undefined}
-          rel={isExternalHref(item.href) ? 'noreferrer' : undefined}
+          rel={isExternalHref(item.href) ? 'noopener noreferrer' : undefined}
           className={`presence-row ${index === 0 ? 'is-primary' : ''}`}
           initial={{ opacity: 0, y: 22 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -1576,7 +1701,7 @@ const MorePage = () => (
 
 const ContactPage = ({ runtimeFlags, shouldRenderBookingScheduler, openContactModal }: ContactPageProps) => (
   <section
-    id="contact"
+    id="request-collaboration"
     className="book-call-section"
     aria-label="Book a call"
     data-color-theme="contact"
@@ -1632,6 +1757,17 @@ const LabsPage = () => (
       data-color-theme="labs"
       data-cinematic-hook="labs-grid"
     >
+      <motion.header
+        className="labs-route-intro"
+        initial={{ opacity: 0, y: 20, filter: 'blur(8px)' }}
+        whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        viewport={{ once: true, amount: 0.35 }}
+        transition={{ duration: 0.66, ease: cinematicEase }}
+      >
+        <p>Interactive prototypes and production-ready experiments</p>
+        <h3>LABS COLLECTION</h3>
+      </motion.header>
+
       <div className="labs-route-grid">
         {labProjects.map((lab, index) => {
           const isLive = lab.status === 'LIVE';
@@ -1644,12 +1780,15 @@ const LabsPage = () => (
               viewport={{ once: true, amount: 0.35 }}
               transition={{ duration: 0.52, delay: index * 0.06, ease: cinematicEase }}
             >
-              <p className="lab-route-status">{lab.status}</p>
+              <div className="lab-route-topline">
+                <p className="lab-route-status">{lab.status}</p>
+                <span className="lab-route-updated">{lab.lastUpdated}</span>
+              </div>
               <h3>{lab.title}</h3>
               <p>{lab.description}</p>
               <div className="lab-route-meta">
                 <span>{lab.category}</span>
-                <span>{lab.lastUpdated}</span>
+                <span>{lab.slug.replace('-', ' ')}</span>
               </div>
               {isLive ? (
                 <Link to={`/labs/${lab.slug}`} className="lab-route-link">
@@ -1820,29 +1959,33 @@ export default function App() {
 
   const activeTheme = useMemo(() => resolvePathTheme(location.pathname), [location.pathname]);
 
-  const heatMapCells = useMemo(() => {
-    const total = 52 * 7;
-    return Array.from({ length: total }, (_, index) => getHeatValue(index + 1));
-  }, []);
+  // Fetch GitHub contributions with fallback to static data
+  const { data: githubData } = useGitHubContributions({
+    username: 'swarajmundhe22-coder',
+    totalContributions: githubHeatMapContributionTotal,
+    contributionCells: githubHeatMapCells,
+    lastUpdated: new Date().toISOString(),
+  });
 
-  const heatMapLevels = useMemo(() => heatMapCells.map((value) => getHeatLevel(value)), [heatMapCells]);
-  const contributionTotal = 1159;
+  // Use the fetched data if available, otherwise fall back to static data
+  const heatMapCells = githubData?.contributionCells ?? githubHeatMapCells;
+  const heatMapWeeks = githubHeatMapWeeks;
+  const heatMapMonthLabels = githubHeatMapMonthLabels;
+  const contributionTotal = githubData?.totalContributions ?? githubHeatMapContributionTotal;
 
   const skeletonCards = useMemo(() => Array.from({ length: 4 }, (_, index) => index), []);
   const skeletonBlogs = useMemo(() => Array.from({ length: 8 }, (_, index) => index), []);
 
   const githubProfileHref =
-    socialHandles.find((item) => item.label === 'GitHub Profile')?.href ??
-    'https://github.com/Sartahkakaedar';
-  const repositoryHref =
-    socialHandles.find((item) => item.label === 'Main Repository')?.href ??
-    'https://github.com/Sartahkakaedar/On-Lookers-Founder-Portfolio-';
-  const issuesHref =
-    socialHandles.find((item) => item.label === 'Open Issues')?.href ??
-    'https://github.com/Sartahkakaedar/On-Lookers-Founder-Portfolio-/issues';
-  const emailHref =
-    socialHandles.find((item) => item.label === 'Email')?.href ??
-    'mailto:swarajmundhe22@gmail.com';
+    socialHandles.find((item) => item.label === 'GitHub')?.href ??
+    'https://github.com/swarajmundhe22-coder';
+  const linkedinHref =
+    socialHandles.find((item) => item.label === 'LinkedIn')?.href ??
+    'https://www.linkedin.com/in/swaraj-mundhe-0a145b393?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app';
+  const instagramHref =
+    socialHandles.find((item) => item.label === 'Instagram')?.href ??
+    'https://www.instagram.com/vvxxvi_15?igsh=MXZnNjd4emRjeDFyOQ==';
+  const emailHref = `mailto:${profileIdentity.email}`;
 
   const { scrollYProgress } = useScroll();
   const ambientY = useTransform(scrollYProgress, [0, 1], ['-8%', '22%']);
@@ -1894,6 +2037,34 @@ export default function App() {
     root.style.setProperty('--cinematic-saturation', spec.saturation.toFixed(3));
     root.style.setProperty('--cinematic-lift', spec.lift.toFixed(3));
   }, [activeTheme]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    const hashTarget = decodeURIComponent(location.hash.replace('#', ''));
+    if (!hashTarget) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      return;
+    }
+
+    const scrollToTarget = (): void => {
+      const targetElement = document.getElementById(hashTarget);
+      if (!targetElement) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        return;
+      }
+
+      targetElement.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    };
+
+    const timer = window.setTimeout(scrollToTarget, 40);
+    return () => window.clearTimeout(timer);
+  }, [location.pathname, location.hash, prefersReducedMotion]);
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -2154,7 +2325,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [contactModalOpen]);
 
-  const goToRoute = (id: string): void => {
+  const goToRoute = (id: string, hash?: string): void => {
     const routeMap: Record<string, string> = {
       home: '/',
       about: '/about',
@@ -2166,7 +2337,8 @@ export default function App() {
 
     setMobileNavOpen(false);
     setMoreMenuOpen(false);
-    navigate(routeMap[id] ?? '/');
+    const route = routeMap[id] ?? '/';
+    navigate(hash ? `${route}${hash}` : route);
   };
 
   const openContactModal = (): void => {
@@ -2325,11 +2497,11 @@ export default function App() {
                     <HomePage
                       runtimeFlags={runtimeFlags}
                       brightnessMode={brightnessMode}
-                      repositoryHref={repositoryHref}
+                      linkedinHref={linkedinHref}
                       githubProfileHref={githubProfileHref}
-                      issuesHref={issuesHref}
+                      instagramHref={instagramHref}
                       emailHref={emailHref}
-                      goToContactPage={() => goToRoute('contact')}
+                      goToContactPage={() => goToRoute('contact', '#request-collaboration')}
                       heroY={heroY}
                       heroOpacity={heroOpacity}
                       heroLeadY={heroLeadY}
@@ -2343,7 +2515,9 @@ export default function App() {
                   element={
                     <AboutPage
                       contributionTotal={contributionTotal}
-                      heatMapLevels={heatMapLevels}
+                      heatMapWeeks={heatMapWeeks}
+                      heatMapMonthLabels={heatMapMonthLabels}
+                      heatMapCells={heatMapCells}
                     />
                   }
                 />
@@ -2380,6 +2554,7 @@ export default function App() {
                 <Route path="/labs/galaxy-field" element={<GalaxyFieldPage />} />
                 <Route path="/uses" element={<UsesPage />} />
                 <Route path="/guestbook" element={<GuestbookPage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </motion.div>
@@ -2416,7 +2591,7 @@ export default function App() {
                           key={link.label}
                           href={link.href}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                         >
                           {link.label}
                         </a>
@@ -2435,23 +2610,14 @@ export default function App() {
           <section className="footer-bottom">
             <small>© 2026 {profileIdentity.copyrightName}. All rights reserved.</small>
             <div className="footer-socials">
-              <a href={githubProfileHref} target="_blank" rel="noreferrer" aria-label="GitHub">
+              <a href={githubProfileHref} target="_blank" rel="noopener noreferrer" aria-label="GitHub">
                 <Github size={16} />
               </a>
-              <a href={repositoryHref} target="_blank" rel="noreferrer" aria-label="Repository">
+              <a href={linkedinHref} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
                 <Linkedin size={16} />
               </a>
-              <a href={issuesHref} target="_blank" rel="noreferrer" aria-label="Open issues">
-                <X size={16} />
-              </a>
-              <a href={emailHref} aria-label="Email">
-                <Mail size={16} />
-              </a>
-              <a href={emailHref} aria-label="Direct Message">
-                <Send size={16} />
-              </a>
-              <a href={repositoryHref} target="_blank" rel="noreferrer" aria-label="External">
-                <ExternalLink size={16} />
+              <a href={instagramHref} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                <Instagram size={16} />
               </a>
             </div>
           </section>
